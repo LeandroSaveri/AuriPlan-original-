@@ -1,0 +1,217 @@
+// ============================================
+// PRISMA SCHEMA - Database Schema
+// ============================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Users
+model User {
+  id        String   @id @default(uuid())
+  email     String   @unique
+  password  String
+  name      String
+  avatar    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  ownedProjects     Project[]
+  collaborations    ProjectCollaborator[]
+  savedFurniture    UserSavedFurniture[]
+  
+  @@map("users")
+}
+
+// Projects
+model Project {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  data        Json     @default("{}")
+  version     String   @default("1.0.0")
+  isPublic    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  ownerId       String
+  owner         User                  @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  collaborators ProjectCollaborator[]
+  floors        Floor[]
+  shareTokens   ShareToken[]
+
+  @@map("projects")
+}
+
+// Project Collaborators
+model ProjectCollaborator {
+  id   String @id @default(uuid())
+  role String @default("viewer") // owner, editor, viewer
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+
+  @@unique([projectId, userId])
+  @@map("project_collaborators")
+}
+
+// Share Tokens
+model ShareToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  projectId String
+  project   Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+
+  @@map("share_tokens")
+}
+
+// Floors
+model Floor {
+  id     String @id @default(uuid())
+  name   String
+  level  Int    @default(0)
+  height Float  @default(2.8)
+  data   Json   @default("{}")
+
+  // Relations
+  projectId String
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  walls     Wall[]
+  rooms     Room[]
+  furniture Furniture[]
+
+  @@map("floors")
+}
+
+// Walls
+model Wall {
+  id   String @id @default(uuid())
+  data Json   @default("{}")
+
+  // Relations
+  floorId String
+  floor   Floor @relation(fields: [floorId], references: [id], onDelete: Cascade)
+
+  @@map("walls")
+}
+
+// Rooms
+model Room {
+  id   String @id @default(uuid())
+  data Json   @default("{}")
+
+  // Relations
+  floorId String
+  floor   Floor @relation(fields: [floorId], references: [id], onDelete: Cascade)
+
+  @@map("rooms")
+}
+
+// Furniture
+model Furniture {
+  id   String @id @default(uuid())
+  data Json   @default("{}")
+
+  // Relations
+  floorId String
+  floor   Floor @relation(fields: [floorId], references: [id], onDelete: Cascade)
+
+  @@map("furniture")
+}
+
+// Furniture Categories
+model FurnitureCategory {
+  id          String @id @default(uuid())
+  name        String
+  slug        String @unique
+  description String?
+  icon        String?
+  sortOrder   Int    @default(0)
+
+  // Relations
+  items FurnitureItem[]
+
+  @@map("furniture_categories")
+}
+
+// Furniture Items
+model FurnitureItem {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  type        String
+  brand       String?
+  price       Float?
+  currency    String   @default("USD")
+  tags        String[]
+  isPremium   Boolean  @default(false)
+  isPopular   Boolean  @default(false)
+  data        Json     @default("{}")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  categoryId String
+  category   FurnitureCategory  @relation(fields: [categoryId], references: [id])
+  materials  FurnitureMaterial[]
+  variants   FurnitureVariant[]
+  savedBy    UserSavedFurniture[]
+
+  @@map("furniture_items")
+}
+
+// Furniture Materials
+model FurnitureMaterial {
+  id   String @id @default(uuid())
+  name String
+  type String
+  data Json   @default("{}")
+
+  // Relations
+  itemId String
+  item   FurnitureItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("furniture_materials")
+}
+
+// Furniture Variants
+model FurnitureVariant {
+  id    String @id @default(uuid())
+  name  String
+  color String
+  data  Json   @default("{}")
+
+  // Relations
+  itemId String
+  item   FurnitureItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@map("furniture_variants")
+}
+
+// User Saved Furniture
+model UserSavedFurniture {
+  id        String   @id @default(uuid())
+  createdAt DateTime @default(now())
+
+  userId String
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId String
+  item   FurnitureItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId])
+  @@map("user_saved_furniture")
+}

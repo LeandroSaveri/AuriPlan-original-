@@ -3,8 +3,10 @@
 // ============================================
 
 import { useRef, useEffect, useState, useCallback } from 'react';
+
 import { useEditorStore, selectCurrentScene } from '@store/editorStore';
 import { SnapSystem } from '@core/snap/SnapSystem';
+
 import type { Vec2 } from '@types';
 
 interface Point {

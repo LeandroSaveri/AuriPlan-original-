@@ -27,7 +27,7 @@ import {
   Menu,
   ChevronDown,
   Layers,
-  Cube,
+  Box as Cube,
   Split,
   FileImage,
   Share2,

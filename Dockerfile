@@ -1,25 +1,21 @@
-# ============================================
-# DOCKERFILE - Frontend Build
-# ============================================
+import { defineConfig } from 'vite';
+import react from '@vitejs/plugin-react';
+import path from 'path';
+import svgr from 'vite-plugin-svgr';
+import tsconfigPaths from 'vite-tsconfig-paths';
 
-FROM node:18-alpine AS builder
-
-WORKDIR /app
-
-COPY package*.json ./
-
-RUN npm install
-
-COPY . .
-
-RUN npm run build || true
-
-FROM nginx:alpine
-
-COPY --from=builder /app/dist /usr/share/nginx/html
-
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+export default defineConfig({
+  plugins: [
+    react(),
+    svgr(),
+    tsconfigPaths(),
+  ],
+  resolve: {
+    // ADICIONAR ISSO:
+    extensions: ['.mjs', '.js', '.ts', '.jsx', '.tsx', '.json'],
+    alias: {
+      // ... resto dos aliases
+    },
+  },
+  // ... resto da config
+});

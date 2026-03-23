@@ -274,3 +274,20 @@ export const numeric = {
   
   equals: (a: number, b: number, epsilon = 1e-10): boolean => Math.abs(a - b) < epsilon,
 };
+
+// ============================================
+// Snap Vector to Grid
+// ============================================
+
+/**
+ * Snap a 2D vector to the nearest grid intersection
+ * @param v - The vector to snap
+ * @param gridSize - The size of the grid cells
+ * @returns The snapped vector
+ */
+export function snapVectorToGrid(v: Vec2, gridSize: number): Vec2 {
+  return [
+    Math.round(v[0] / gridSize) * gridSize,
+    Math.round(v[1] / gridSize) * gridSize,
+  ];
+}

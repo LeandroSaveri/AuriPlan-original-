@@ -4,26 +4,31 @@
 
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+
 import { useEditorStore, selectProjectStats } from '@store/editorStore';
-import { Toolbar } from './components/Toolbar';
-import { Canvas2D } from './components/Canvas2D';
-import { Canvas3D } from './components/Canvas3D';
-import { PropertiesPanel } from './components/PropertiesPanel';
-import { FurnitureCatalog } from './components/FurnitureCatalog';
-import { Sidebar } from './components/Sidebar';
-import { StatusBar } from './components/StatusBar';
-import { AIAssistant } from './components/AIAssistant';
-import { ProjectManager } from './components/ProjectManager';
+
+import { Toolbar } from './components/Toolbar.tsx';
+import { Canvas2D } from './components/Canvas2D.tsx';
+import { Canvas3D } from './components/Canvas3D.tsx';
+import { PropertiesPanel } from './components/PropertiesPanel.tsx';
+import { FurnitureCatalog } from './components/FurnitureCatalog.tsx';
+import { Sidebar } from './components/Sidebar.tsx';
+import { StatusBar } from './components/StatusBar.tsx';
+import { AIAssistant } from './components/AIAssistant.tsx';
+import { ProjectManager } from './components/ProjectManager.tsx';
+
 import { TemplateGallery } from '@features/templates/TemplateGallery';
 import { QuotationSystem } from '@features/quotation/QuotationSystem';
 import { VirtualTour } from '@features/tour/VirtualTour';
 import { ShareSystem } from '@features/share/ShareSystem';
+
 import type { ViewMode, Tool } from '@types';
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Layers, 
-  Box, 
+
+import {
+  ChevronLeft,
+  ChevronRight,
+  Layers,
+  Box,
   Palette,
   Sparkles,
   FolderOpen,

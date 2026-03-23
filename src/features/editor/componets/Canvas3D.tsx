@@ -4,27 +4,35 @@
 
 import { Suspense, useRef, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { 
-  OrbitControls, 
-  Grid, 
-  Environment, 
+import {
+  OrbitControls,
+  Grid,
+  Environment,
   ContactShadows,
   PerspectiveCamera,
   Box as DreiBox,
   Plane
 } from '@react-three/drei';
+
 import { useEditorStore, selectCurrentScene } from '@store/editorStore';
 import * as THREE from 'three';
 
+import type { Wall } from '@types';
+
 // Wall Component
-function Wall3D({ wall }: { wall: import('@types').Wall }) {
+function Wall3D({ wall }: { wall: Wall }) {
   const start = new THREE.Vector3(wall.start[0], 0, wall.start[1]);
   const end = new THREE.Vector3(wall.end[0], 0, wall.end[1]);
+
   const direction = new THREE.Vector3().subVectors(end, start);
   const length = direction.length();
+
   const angle = Math.atan2(direction.z, direction.x);
 
-  const position = new THREE.Vector3().addVectors(start, end).multiplyScalar(0.5);
+  const position = new THREE.Vector3()
+    .addVectors(start, end)
+    .multiplyScalar(0.5);
+
   position.y = wall.height / 2;
 
   return (

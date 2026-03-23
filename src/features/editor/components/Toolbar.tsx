@@ -7,7 +7,7 @@ import {
   Move, 
   Hand,
   ZoomIn, 
-  Wall, 
+  Square as Wall,
   Square, 
   Box,
   DoorOpen,

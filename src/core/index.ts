@@ -2,16 +2,16 @@
 // CORE INDEX - Exportação de Core Engines
 // ============================================
 
-export * from './math/vector.ts';
-export { SnapEngine } from './snap/SnapEngine.ts';
-export { SnapSystem } from './snap/SnapSystem.ts';
-export { HistoryEngine } from './history/HistoryEngine.ts';
-export { HistoryManager } from './history/HistoryManager.ts';
-export { WallEngine } from './wall/WallEngine.ts';
-export { RoomEngine } from './room/RoomEngine.ts';
-export { CollisionEngine } from './collision/CollisionEngine.ts';
-export { CameraEngine } from './camera/CameraEngine.ts';
-export { GridEngine } from './grid/GridEngine.ts';
-export { InteractionEngine } from './interaction/InteractionEngine.ts';
-export { ExportEngine } from './export/ExportEngine.ts';
-export { ImportEngine } from './import/ImportEngine.ts';
+export * from './math/vector';
+export { SnapEngine } from './snap/SnapEngine';
+export { SnapSystem } from './snap/SnapSystem';
+export { HistoryEngine } from './history/HistoryEngine';
+export { HistoryManager } from './history/HistoryManager';
+export { WallEngine } from './wall/WallEngine';
+export { RoomEngine } from './room/RoomEngine';
+export { CollisionEngine } from './collision/CollisionEngine';
+export { CameraEngine } from './camera/CameraEngine';
+export { GridEngine } from './grid/GridEngine';
+export { InteractionEngine } from './interaction/InteractionEngine';
+export { ExportEngine } from './export/ExportEngine';
+export { ImportEngine } from './import/ImportEngine';

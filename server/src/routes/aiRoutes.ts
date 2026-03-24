@@ -3,7 +3,7 @@
  */
 
 import { Router, Request, Response } from 'express';
-import { aiInterpreterService } from '../services/AIInterpreterService';
+import { aiInterpreterService } from '../services/AIInterpreterService.js';
 
 const router = Router();
 

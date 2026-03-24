@@ -4,7 +4,7 @@
 
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../db';
+import { prisma } from '../db.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
@@ -88,7 +88,7 @@ export function setupWebSocket(io: Server) {
       // Send current users in room
       const room = io.sockets.adapter.rooms.get(projectId);
       const usersInRoom: Array<{ socketId: string; name: string; color: string }> = [];
-      
+
       room?.forEach((socketId) => {
         const clientSocket = io.sockets.sockets.get(socketId);
         if (clientSocket && socketId !== socket.id) {
@@ -164,7 +164,7 @@ export function setupWebSocket(io: Server) {
     // Disconnect
     socket.on('disconnect', () => {
       console.log(`User disconnected: ${user.name} (${socket.id})`);
-      
+
       // Notify all rooms
       socket.rooms.forEach((room) => {
         if (room !== socket.id) {

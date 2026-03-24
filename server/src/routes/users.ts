@@ -2,16 +2,16 @@
 // USERS ROUTES - Rotas de Usuários
 // ============================================
 
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { body, validationResult } from 'express-validator';
-import { prisma } from '../db';
-import { authenticate } from '../middleware/authenticate';
+import { prisma } from '../db/index.js';
+import { authenticate } from '../middleware/authenticate.js';
 import bcrypt from 'bcryptjs';
 
 const router = Router();
 
 // Get current user profile
-router.get('/me', authenticate, async (req, res, next) => {
+router.get('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const user = await prisma.user.findUnique({
       where: { id: req.userId },
@@ -44,7 +44,7 @@ router.get('/me', authenticate, async (req, res, next) => {
 router.patch('/me', authenticate, [
   body('name').optional().trim().isLength({ min: 2 }),
   body('email').optional().isEmail().normalizeEmail(),
-], async (req, res, next) => {
+], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -93,7 +93,7 @@ router.patch('/me', authenticate, [
 router.post('/me/change-password', authenticate, [
   body('currentPassword').exists(),
   body('newPassword').isLength({ min: 6 }),
-], async (req, res, next) => {
+], async (req: Request, res: Response, next: NextFunction) => {
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -129,7 +129,7 @@ router.post('/me/change-password', authenticate, [
 });
 
 // Get user stats
-router.get('/me/stats', authenticate, async (req, res, next) => {
+router.get('/me/stats', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const [projectsCount, collaborationsCount, totalWalls, totalRooms, totalFurniture] = await Promise.all([
       prisma.project.count({ where: { ownerId: req.userId } }),
@@ -187,7 +187,7 @@ router.get('/me/stats', authenticate, async (req, res, next) => {
 });
 
 // Delete account
-router.delete('/me', authenticate, async (req, res, next) => {
+router.delete('/me', authenticate, async (req: Request, res: Response, next: NextFunction) => {
   try {
     await prisma.user.delete({
       where: { id: req.userId },

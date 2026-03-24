@@ -13,6 +13,10 @@ RUN apk add --no-cache openssl
 COPY package*.json ./
 COPY prisma ./prisma/
 
+# Limpar cache e reinstalar (força instalação do openai)
+RUN rm -rf node_modules package-lock.json
+RUN npm cache clean --force
+
 # Install dependencies (including devDependencies)
 RUN npm install
 

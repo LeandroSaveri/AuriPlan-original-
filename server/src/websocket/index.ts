@@ -4,7 +4,7 @@
 
 import { Server } from 'socket.io';
 import jwt from 'jsonwebtoken';
-import { prisma } from '../db.js';
+import { prisma } from '../db/index.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 

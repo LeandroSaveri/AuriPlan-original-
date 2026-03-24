@@ -3,21 +3,7 @@
 // ============================================
 
 import type { Vec2, Wall, Room, FurnitureItem, SnapState } from '@types';
-import {
-  distance,
-  distanceSquared,
-  snapVectorToGrid,
-  pointOnLine,
-  subtractVectors,
-  vectorLength,
-  normalizeVector,
-  scaleVector,
-  addVectors,
-  dotProduct,
-  angleFromX,
-  degToRad,
-  radToDeg,
-} from '@core/math/vector';
+import { vec2, geometry, numeric, snapVectorToGrid } from '@core/math/vector';
 
 // Tipos de snap
 export type SnapType =
@@ -129,7 +115,7 @@ export class SnapSystem {
     // Grid snap
     if (this.config.priorities.includes('grid')) {
       const gridPoint = snapVectorToGrid(point, this.config.gridSize);
-      const gridDist = distance(point, gridPoint);
+      const gridDist = vec2.distance(point, gridPoint);
       if (gridDist < this.config.snapDistance) {
         candidates.push({
           point: gridPoint,
@@ -143,7 +129,7 @@ export class SnapSystem {
     if (this.config.priorities.includes('endpoint')) {
       const endpoints = this.getAllEndpoints();
       for (const endpoint of endpoints) {
-        const dist = distance(point, endpoint.point);
+        const dist = vec2.distance(point, endpoint.point);
         if (dist < this.config.snapDistance) {
           candidates.push({
             point: endpoint.point,
@@ -159,7 +145,7 @@ export class SnapSystem {
     if (this.config.priorities.includes('midpoint')) {
       const midpoints = this.getAllMidpoints();
       for (const midpoint of midpoints) {
-        const dist = distance(point, midpoint.point);
+        const dist = vec2.distance(point, midpoint.point);
         if (dist < this.config.snapDistance) {
           candidates.push({
             point: midpoint.point,
@@ -175,17 +161,15 @@ export class SnapSystem {
     if (this.config.priorities.includes('edge')) {
       const edges = this.getAllEdges();
       for (const edge of edges) {
-        const projected = pointOnLine(point, edge.start, edge.end);
-        if (projected) {
-          const dist = distance(point, projected);
-          if (dist < this.config.snapDistance) {
-            candidates.push({
-              point: projected,
-              type: 'edge',
-              source: edge.id,
-              distance: dist,
-            });
-          }
+        const projected = geometry.projectPointOnLine(point, edge.start, edge.end);
+        const dist = vec2.distance(point, projected);
+        if (dist < this.config.snapDistance) {
+          candidates.push({
+            point: projected,
+            type: 'edge',
+            source: edge.id,
+            distance: dist,
+          });
         }
       }
     }
@@ -194,7 +178,7 @@ export class SnapSystem {
     if (this.config.priorities.includes('center')) {
       const centers = this.getAllCenters();
       for (const center of centers) {
-        const dist = distance(point, center.point);
+        const dist = vec2.distance(point, center.point);
         if (dist < this.config.snapDistance) {
           candidates.push({
             point: center.point,
@@ -210,7 +194,7 @@ export class SnapSystem {
     if (this.config.priorities.includes('perpendicular') && this.lastPoint) {
       const perpPoints = this.getPerpendicularPoints(this.lastPoint);
       for (const perp of perpPoints) {
-        const dist = distance(point, perp.point);
+        const dist = vec2.distance(point, perp.point);
         if (dist < this.config.snapDistance) {
           candidates.push({
             point: perp.point,
@@ -252,12 +236,12 @@ export class SnapSystem {
 
   // Snap para ângulos específicos
   private snapToAngle(point: Vec2, center: Vec2): SnapResult | null {
-    const vector = subtractVectors(point, center);
-    const currentAngle = angleFromX(vector);
-    const length = vectorLength(vector);
+    const vector = vec2.sub(point, center);
+    const currentAngle = vec2.angle(vector);
+    const length = vec2.length(vector);
     
     // Converte para graus
-    let degrees = radToDeg(currentAngle);
+    let degrees = numeric.radToDeg(currentAngle);
     if (degrees < 0) degrees += 360;
     
     // Encontra o ângulo mais próximo
@@ -265,7 +249,7 @@ export class SnapSystem {
     const angleDiff = Math.abs(degrees - snapAngle);
     
     if (angleDiff < 5) { // Tolerância de 5 graus
-      const snappedAngle = degToRad(snapAngle);
+      const snappedAngle = numeric.degToRad(snapAngle);
       const snappedPoint: Vec2 = [
         center[0] + Math.cos(snappedAngle) * length,
         center[1] + Math.sin(snappedAngle) * length,
@@ -274,7 +258,7 @@ export class SnapSystem {
       return {
         point: snappedPoint,
         type: 'angle',
-        distance: distance(point, snappedPoint),
+        distance: vec2.distance(point, snappedPoint),
       };
     }
     
@@ -283,9 +267,9 @@ export class SnapSystem {
 
   // Snap para distâncias específicas
   snapToDistance(point: Vec2, startPoint: Vec2, distances: number[]): SnapResult | null {
-    const vector = subtractVectors(point, startPoint);
-    const currentDistance = vectorLength(vector);
-    const direction = normalizeVector(vector);
+    const vector = vec2.sub(point, startPoint);
+    const currentDistance = vec2.length(vector);
+    const direction = vec2.normalize(vector);
     
     let bestSnap: SnapResult | null = null;
     let bestDiff = Infinity;
@@ -294,7 +278,7 @@ export class SnapSystem {
       const diff = Math.abs(currentDistance - targetDistance);
       if (diff < this.config.distanceSnap && diff < bestDiff) {
         bestDiff = diff;
-        const snappedPoint = addVectors(startPoint, scaleVector(direction, targetDistance));
+        const snappedPoint = vec2.add(startPoint, vec2.mul(direction, targetDistance));
         bestSnap = {
           point: snappedPoint,
           type: 'distance',
@@ -371,10 +355,8 @@ export class SnapSystem {
     const points: { point: Vec2; id: string }[] = [];
     
     for (const wall of this.walls) {
-      const projected = pointOnLine(fromPoint, wall.start, wall.end);
-      if (projected) {
-        points.push({ point: projected, id: wall.id });
-      }
+      const projected = geometry.projectPointOnLine(fromPoint, wall.start, wall.end);
+      points.push({ point: projected, id: wall.id });
     }
     
     return points;

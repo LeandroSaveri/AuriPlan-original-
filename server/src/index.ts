@@ -16,7 +16,7 @@ import { usersRouter } from './routes/users.js';
 import { projectsRouter } from './routes/projects.js';
 import { furnitureRouter } from './routes/furniture.js';
 import { exportRouter } from './routes/export.js';
-import { aiRouter } from './routes/aiRoutes.js';
+import aiRouter from './routes/aiRoutes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { setupWebSocket } from './websocket/index.js';
 

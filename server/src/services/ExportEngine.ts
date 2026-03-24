@@ -7,6 +7,23 @@ import jwt from 'jsonwebtoken';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
 
+// Type definitions for wall/room data to avoid Prisma JsonValue issues
+interface WallData {
+  start?: number[];
+  end?: number[];
+  thickness?: number;
+  height?: number;
+  color?: string;
+  [key: string]: any;
+}
+
+interface RoomData {
+  points?: number[][];
+  floorColor?: string;
+  wallColor?: string;
+  [key: string]: any;
+}
+
 export class ExportEngine {
   static toJSON(project: Project & { floors: Array<Floor & { walls: Wall[]; rooms: Room[]; furniture: Furniture[] }> }): string {
     return JSON.stringify({
@@ -40,10 +57,12 @@ export class ExportEngine {
 
       // Export walls
       floor.walls.forEach((wall, wallIndex) => {
-        const start = wall.data?.start || [0, 0];
-        const end = wall.data?.end || [1, 0];
-        const thickness = (wall.data?.thickness || 0.15) * 10;
-        const height = wall.data?.height || 2.8;
+        // Type assertion to avoid Prisma JsonValue type issues
+        const wallData = wall.data as WallData;
+        const start = wallData?.start || [0, 0];
+        const end = wallData?.end || [1, 0];
+        const thickness = (wallData?.thickness || 0.15) * 10;
+        const height = wallData?.height || 2.8;
 
         const dx = end[0] - start[0];
         const dy = end[1] - start[1];
@@ -108,25 +127,29 @@ export class ExportEngine {
 
     // Render rooms
     floor.rooms.forEach(room => {
-      const points = room.data?.points || [];
+      // Type assertion to avoid Prisma JsonValue type issues
+      const roomData = room.data as RoomData;
+      const points = roomData?.points || [];
       if (points.length >= 3) {
         const pointsStr = points.map((p: number[]) => `${p[0] * scale + width/2},${p[1] * scale + height/2}`).join(' ');
         svg += `
-  <polygon points="${pointsStr}" fill="${room.data?.floorColor || '#D2691E'}" 
-    stroke="${room.data?.wallColor || '#F5F5DC'}" stroke-width="2" opacity="0.5"/>`;
+  <polygon points="${pointsStr}" fill="${roomData?.floorColor || '#D2691E'}" 
+    stroke="${roomData?.wallColor || '#F5F5DC'}" stroke-width="2" opacity="0.5"/>`;
       }
     });
 
     // Render walls
     floor.walls.forEach(wall => {
-      const start = wall.data?.start || [0, 0];
-      const end = wall.data?.end || [1, 0];
-      const thickness = (wall.data?.thickness || 0.15) * 10;
+      // Type assertion to avoid Prisma JsonValue type issues
+      const wallData = wall.data as WallData;
+      const start = wallData?.start || [0, 0];
+      const end = wallData?.end || [1, 0];
+      const thickness = (wallData?.thickness || 0.15) * 10;
 
       svg += `
   <line x1="${start[0] * scale + width/2}" y1="${start[1] * scale + height/2}" 
     x2="${end[0] * scale + width/2}" y2="${end[1] * scale + height/2}" 
-    stroke="${wall.data?.color || '#8B4513'}" stroke-width="${thickness}" stroke-linecap="round"/>`;
+    stroke="${wallData?.color || '#8B4513'}" stroke-width="${thickness}" stroke-linecap="round"/>`;
     });
 
     svg += '\n</svg>';

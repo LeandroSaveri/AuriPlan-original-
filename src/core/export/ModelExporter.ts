@@ -27,7 +27,10 @@ export interface ModelExportResult {
   vertexCount: number;
 }
 
-class ModelExporter {
+// ============================================
+// CLASSE EXPORTADA - ADICIONADO 'export'
+// ============================================
+export class ModelExporter {
   private defaultOptions: ModelExportOptions = {
     format: 'glb',
     includeTextures: true,

@@ -3,272 +3,250 @@
 // Gerenciamento centralizado do estado do editor
 // ============================================
 
-import { useCallback, useEffect, useRef } from 'react';
-import { useEditorStore } from '../../store/editorStore';
-import { editorActions } from '../../store/editorActions';
-import { Point2D, WallData, RoomData } from '../../types/editor';
-import { snapToGrid } from '../../utils/numeric';
+import { useCallback } from 'react';
+import { useEditorStore } from '../../store';
+import type { EditorState } from '../../store';
+import type { Wall, Room } from '../../types';
 
 // ============================================
-// TIPOS
+// TIPOS AUXILIARES
 // ============================================
 
-interface UseEditorReturn {
-  // Estado
-  walls: WallData[];
-  rooms: RoomData[];
-  selectedId: string | null;
-  tool: 'select' | 'wall' | 'room' | 'move';
-  scale: number;
-  offset: { x: number; y: number };
-  isDragging: boolean;
-  isDrawing: boolean;
-  snapEnabled: boolean;
-  gridSize: number;
-  showGrid: boolean;
-
-  // Ações de ferramenta
-  setTool: (tool: 'select' | 'wall' | 'room' | 'move') => void;
-
-  // Ações de câmera
-  setScale: (scale: number) => void;
-  setOffset: (offset: { x: number; y: number }) => void;
-  zoomIn: () => void;
-  zoomOut: () => void;
-  resetView: () => void;
-  pan: (deltaX: number, deltaY: number) => void;
-
-  // Ações de parede
-  addWall: (wall: Omit<WallData, 'id'>) => string;
-  updateWall: (id: string, updates: Partial<WallData>) => void;
-  deleteWall: (id: string) => void;
-
-  // Ações de cômodo
-  addRoom: (room: Omit<RoomData, 'id'>) => string;
-  updateRoom: (id: string, updates: Partial<RoomData>) => void;
-  deleteRoom: (id: string) => void;
-
-  // Ações de seleção
-  selectObject: (id: string | null) => void;
-  clearSelection: () => void;
-
-  // Ações de desenho
-  startDrawing: () => void;
-  stopDrawing: () => void;
-
-  // Ações de drag
-  startDrag: () => void;
-  stopDrag: () => void;
-
-  // Snap
-  toggleSnap: () => void;
-  setGridSize: (size: number) => void;
-  toggleGrid: () => void;
-  snapPoint: (point: Point2D) => Point2D;
-
-  // Histórico
-  undo: () => void;
-  redo: () => void;
-  canUndo: boolean;
-  canRedo: boolean;
-
-  // Projeto
-  clearProject: () => void;
-  loadProject: (data: { walls: WallData[]; rooms: RoomData[] }) => void;
-
-  // Helpers
-  getWallById: (id: string) => WallData | undefined;
-  getRoomById: (id: string) => RoomData | undefined;
-  getSelectedObject: () => { type: 'wall' | 'room' | null; data: WallData | RoomData | null };
+export interface WallData {
+  id: string;
+  start: [number, number];
+  end: [number, number];
+  thickness?: number;
+  height?: number;
+  color?: string;
 }
+
+export interface RoomData {
+  id: string;
+  name: string;
+  points: [number, number][];
+  area?: number;
+  perimeter?: number;
+}
+
+export type Tool = 'select' | 'wall' | 'room' | 'move';
 
 // ============================================
 // HOOK PRINCIPAL
 // ============================================
 
-export function useEditor(): UseEditorReturn {
+export function useEditor() {
   const store = useEditorStore();
-  const actionsRef = useRef(editorActions);
 
-  // ============================================
-  // MEMORIZAÇÃO DE ESTADO
-  // ============================================
+  // --------------------------------------------
+  // ESTADO DERIVADO
+  // --------------------------------------------
 
-  const walls = store.walls;
-  const rooms = store.rooms;
-  const selectedId = store.selectedId;
-  const tool = store.tool;
-  const scale = store.scale;
-  const offset = store.offset;
-  const isDragging = store.isDragging;
-  const isDrawing = store.isDrawing;
-  const snapEnabled = store.snapEnabled ?? true;
-  const gridSize = store.gridSize ?? 10;
-  const showGrid = store.showGrid ?? true;
-  const history = store.history;
+  const currentScene = store.scenes.find(s => s.id === store.currentSceneId);
 
-  // ============================================
+  const walls: WallData[] = currentScene?.walls.map(w => ({
+    id: w.id,
+    start: w.start,
+    end: w.end,
+    thickness: w.thickness,
+    height: w.height,
+    color: w.color,
+  })) || [];
+
+  const rooms: RoomData[] = currentScene?.rooms.map(r => ({
+    id: r.id,
+    name: r.name,
+    points: r.points,
+    area: r.area,
+    perimeter: r.perimeter,
+  })) || [];
+
+  const selectedId = store.selectedIds[0] || null;
+  const tool = store.tool as Tool;
+  const scale = store.camera.zoom;
+  const offset = { x: store.camera.position[0], y: store.camera.position[1] };
+  const isDragging = false; // TODO: implementar
+  const isDrawing = false; // TODO: implementar
+  const snapEnabled = store.snap.enabled;
+  const gridSize = store.grid.size;
+  const showGrid = store.grid.visible;
+
+  // --------------------------------------------
   // AÇÕES DE FERRAMENTA
-  // ============================================
+  // --------------------------------------------
 
-  const setTool = useCallback((newTool: 'select' | 'wall' | 'room' | 'move') => {
-    actionsRef.current.setTool(newTool);
-  }, []);
+  const setTool = useCallback((newTool: Tool) => {
+    store.setTool(newTool as any);
+  }, [store]);
 
-  // ============================================
+  // --------------------------------------------
   // AÇÕES DE CÂMERA
-  // ============================================
+  // --------------------------------------------
 
   const setScale = useCallback((newScale: number) => {
-    actionsRef.current.setScale(Math.max(0.1, Math.min(5, newScale)));
-  }, []);
+    store.setCamera({ zoom: Math.max(0.1, Math.min(5, newScale)) });
+  }, [store]);
 
   const setOffset = useCallback((newOffset: { x: number; y: number }) => {
-    actionsRef.current.setOffset(newOffset);
-  }, []);
+    store.setCamera({ position: [newOffset.x, newOffset.y, store.camera.position[2]] });
+  }, [store]);
 
   const zoomIn = useCallback(() => {
-    actionsRef.current.setScale(Math.min(5, scale * 1.2));
-  }, [scale]);
+    store.zoomIn();
+  }, [store]);
 
   const zoomOut = useCallback(() => {
-    actionsRef.current.setScale(Math.max(0.1, scale / 1.2));
-  }, [scale]);
+    store.zoomOut();
+  }, [store]);
 
   const resetView = useCallback(() => {
-    actionsRef.current.setScale(1);
-    actionsRef.current.setOffset({ x: 0, y: 0 });
-  }, []);
+    store.fitToView();
+  }, [store]);
 
   const pan = useCallback((deltaX: number, deltaY: number) => {
-    actionsRef.current.setOffset({
-      x: offset.x + deltaX,
-      y: offset.y + deltaY
+    store.setCamera({
+      position: [
+        store.camera.position[0] + deltaX,
+        store.camera.position[1] + deltaY,
+        store.camera.position[2]
+      ]
     });
-  }, [offset]);
+  }, [store]);
 
-  // ============================================
+  // --------------------------------------------
   // AÇÕES DE PAREDE
-  // ============================================
+  // --------------------------------------------
 
   const addWall = useCallback((wall: Omit<WallData, 'id'>): string => {
-    return actionsRef.current.addWall(wall);
-  }, []);
+    store.addWall(wall.start, wall.end);
+    // Retorna o ID da última parede adicionada
+    const scene = store.scenes.find(s => s.id === store.currentSceneId);
+    const lastWall = scene?.walls[scene.walls.length - 1];
+    return lastWall?.id || '';
+  }, [store]);
 
   const updateWall = useCallback((id: string, updates: Partial<WallData>) => {
-    actionsRef.current.updateWall(id, updates);
-  }, []);
+    const updatePayload: Partial<Wall> = {};
+    if (updates.start) updatePayload.start = updates.start;
+    if (updates.end) updatePayload.end = updates.end;
+    if (updates.thickness) updatePayload.thickness = updates.thickness;
+    if (updates.height) updatePayload.height = updates.height;
+    if (updates.color) updatePayload.color = updates.color;
+
+    store.updateWall(id, updatePayload);
+  }, [store]);
 
   const deleteWall = useCallback((id: string) => {
-    actionsRef.current.deleteWall(id);
-  }, []);
+    store.deleteWall(id);
+  }, [store]);
 
-  // ============================================
+  // --------------------------------------------
   // AÇÕES DE CÔMODO
-  // ============================================
+  // --------------------------------------------
 
   const addRoom = useCallback((room: Omit<RoomData, 'id'>): string => {
-    return actionsRef.current.addRoom(room);
-  }, []);
+    store.addRoom(room.points);
+    const scene = store.scenes.find(s => s.id === store.currentSceneId);
+    const lastRoom = scene?.rooms[scene.rooms.length - 1];
+    return lastRoom?.id || '';
+  }, [store]);
 
   const updateRoom = useCallback((id: string, updates: Partial<RoomData>) => {
-    actionsRef.current.updateRoom(id, updates);
-  }, []);
+    const updatePayload: Partial<Room> = {};
+    if (updates.name) updatePayload.name = updates.name;
+    if (updates.points) updatePayload.points = updates.points;
+
+    store.updateRoom(id, updatePayload);
+  }, [store]);
 
   const deleteRoom = useCallback((id: string) => {
-    actionsRef.current.deleteRoom(id);
-  }, []);
+    store.deleteRoom(id);
+  }, [store]);
 
-  // ============================================
+  // --------------------------------------------
   // AÇÕES DE SELEÇÃO
-  // ============================================
+  // --------------------------------------------
 
   const selectObject = useCallback((id: string | null) => {
-    actionsRef.current.selectObject(id);
-  }, []);
+    if (id) {
+      store.select(id);
+    } else {
+      store.deselectAll();
+    }
+  }, [store]);
 
   const clearSelection = useCallback(() => {
-    actionsRef.current.selectObject(null);
-  }, []);
+    store.deselectAll();
+  }, [store]);
 
-  // ============================================
-  // AÇÕES DE DESENHO
-  // ============================================
+  // --------------------------------------------
+  // AÇÕES DE DESENHO/DRAG
+  // --------------------------------------------
 
   const startDrawing = useCallback(() => {
-    store.setIsDrawing(true);
-  }, [store]);
+    // TODO: implementar estado de desenho
+  }, []);
 
   const stopDrawing = useCallback(() => {
-    store.setIsDrawing(false);
-  }, [store]);
-
-  // ============================================
-  // AÇÕES DE DRAG
-  // ============================================
+    // TODO: implementar estado de desenho
+  }, []);
 
   const startDrag = useCallback(() => {
-    store.setIsDragging(true);
-  }, [store]);
+    // TODO: implementar estado de drag
+  }, []);
 
   const stopDrag = useCallback(() => {
-    store.setIsDragging(false);
-  }, [store]);
+    // TODO: implementar estado de drag
+  }, []);
 
-  // ============================================
-  // AÇÕES DE SNAP
-  // ============================================
+  // --------------------------------------------
+  // AÇÕES DE SNAP/GRID
+  // --------------------------------------------
 
   const toggleSnap = useCallback(() => {
-    store.setSnapEnabled(!snapEnabled);
-  }, [store, snapEnabled]);
+    store.setSnap({ enabled: !store.snap.enabled });
+  }, [store]);
 
   const setGridSize = useCallback((size: number) => {
-    store.setGridSize(Math.max(1, Math.min(100, size)));
+    store.setGrid({ size: Math.max(1, Math.min(100, size)) });
   }, [store]);
 
   const toggleGrid = useCallback(() => {
-    store.setShowGrid(!showGrid);
-  }, [store, showGrid]);
+    store.toggleGrid();
+  }, [store]);
 
-  const snapPoint = useCallback((point: Point2D): Point2D => {
-    if (!snapEnabled) return point;
-    return {
-      x: snapToGrid(point.x, gridSize),
-      y: snapToGrid(point.y, gridSize)
-    };
-  }, [snapEnabled, gridSize]);
-
-  // ============================================
+  // --------------------------------------------
   // AÇÕES DE HISTÓRICO
-  // ============================================
+  // --------------------------------------------
 
   const undo = useCallback(() => {
-    actionsRef.current.undo();
-  }, []);
+    store.undo();
+  }, [store]);
 
   const redo = useCallback(() => {
-    actionsRef.current.redo();
-  }, []);
+    store.redo();
+  }, [store]);
 
-  const canUndo = history.past.length > 0;
-  const canRedo = history.future.length > 0;
+  const canUndo = store.canUndo();
+  const canRedo = store.canRedo();
 
-  // ============================================
+  // --------------------------------------------
   // AÇÕES DE PROJETO
-  // ============================================
+  // --------------------------------------------
 
   const clearProject = useCallback(() => {
-    actionsRef.current.clearProject();
-  }, []);
+    // TODO: implementar limpeza de projeto
+    store.deselectAll();
+  }, [store]);
 
   const loadProject = useCallback((data: { walls: WallData[]; rooms: RoomData[] }) => {
-    actionsRef.current.loadProject(data);
+    // TODO: implementar carregamento de projeto
+    console.log('Load project:', data);
   }, []);
 
-  // ============================================
+  // --------------------------------------------
   // HELPERS
-  // ============================================
+  // --------------------------------------------
 
   const getWallById = useCallback((id: string): WallData | undefined => {
     return walls.find(w => w.id === id);
@@ -293,9 +271,9 @@ export function useEditor(): UseEditorReturn {
     return { type: null, data: null };
   }, [walls, rooms, selectedId]);
 
-  // ============================================
+  // --------------------------------------------
   // RETORNO
-  // ============================================
+  // --------------------------------------------
 
   return {
     // Estado
@@ -334,7 +312,6 @@ export function useEditor(): UseEditorReturn {
     toggleSnap,
     setGridSize,
     toggleGrid,
-    snapPoint,
     undo,
     redo,
     canUndo,

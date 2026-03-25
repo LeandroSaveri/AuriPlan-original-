@@ -1,6 +1,6 @@
 // Canvas2D.tsx - Orquestrador Production-Grade Final
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { useEditorStore, selectCurrentScene } from '../../../store/editorStore';
+import { useEditorStore } from '../../../store/editorStore';
 import { CameraEngine } from '../../../core/camera/CameraEngine';
 import { SnapEngine } from '../../../core/snap/SnapEngine';
 import { GridEngine } from '../../../core/grid/GridEngine';

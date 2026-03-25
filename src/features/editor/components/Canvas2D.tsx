@@ -1,690 +1,827 @@
 // ============================================
-// CANVAS 2D - Editor de Planta Baixa
+// Canvas2D.tsx - Orquestrador Enxuto Premium
+// Responsabilidade: Coordenar engines, não implementar lógica
+// Suporte: Mouse + Touch (Mobile)
 // ============================================
 
-import { useRef, useEffect, useState, useCallback } from 'react';
-import { useEditorStore, selectCurrentScene } from '@store/editorStore';
-import { SnapSystem } from '@core/snap/SnapSystem';
+import React, { useRef, useEffect, useCallback, useState } from 'react';
+import { useEditorStore, selectCurrentScene } from '@/store/editorStore';
+import { CameraEngine } from '@core/camera/CameraEngine';
+import { SnapEngine } from '@core/snap/SnapEngine';
+import { GridEngine } from '@core/grid/GridEngine';
+import { InteractionEngine } from '@core/interaction/InteractionEngine';
+import { WallEngine } from '@core/wall/WallEngine';
+import { RoomEngine } from '@core/room/RoomEngine';
 import type { Vec2 } from '@types';
 
-interface Point {
-  x: number;
-  y: number;
+interface Canvas2DProps {
+  className?: string;
 }
 
-export function Canvas2D() {
+interface TouchState {
+  startDistance: number;
+  startZoom: number;
+  lastTouch: Vec2 | null;
+  isPinching: boolean;
+}
+
+export const Canvas2D: React.FC<Canvas2DProps> = ({ className = '' }) => {
+  // Refs DOM
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const animationRef = useRef<number>(0);
   
-  const [scale, setScale] = useState(20);
-  const [offset, setOffset] = useState<Point>({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
-  const [panStart, setPanStart] = useState<Point>({ x: 0, y: 0 });
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [drawStart, setDrawStart] = useState<Point | null>(null);
-  const [mousePos, setMousePos] = useState<Point>({ x: 0, y: 0 });
+  // Engines - cada um com sua responsabilidade única
+  const cameraRef = useRef<CameraEngine>(new CameraEngine({
+    minZoom: 0.1,
+    maxZoom: 10,
+    zoomStep: 1.2
+  }));
+  const snapRef = useRef<SnapEngine>(new SnapEngine());
+  const gridRef = useRef<GridEngine>(new GridEngine());
+  const interactionRef = useRef<InteractionEngine>(new InteractionEngine());
+  const wallRef = useRef<WallEngine>(new WallEngine());
+  const roomRef = useRef<RoomEngine>(new RoomEngine());
+  
+  // Estado local mínimo - apenas UI e interação temporária
+  const [isReady, setIsReady] = useState(false);
   const [hoveredId, setHoveredId] = useState<string | null>(null);
-
-  const {
-    tool,
-    selectedIds,
-    select,
-    grid,
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawStart, setDrawStart] = useState<Vec2 | null>(null);
+  
+  // Touch state para mobile
+  const touchStateRef = useRef<TouchState>({
+    startDistance: 0,
+    startZoom: 1,
+    lastTouch: null,
+    isPinching: false
+  });
+  
+  // Store
+  const { 
+    tool, 
+    selectedIds, 
+    select, 
+    grid: gridConfig,
     snap: snapConfig,
     addWall,
-    addDoor,
-    addWindow,
+    viewMode 
   } = useEditorStore();
-
+  
   const currentScene = useEditorStore(selectCurrentScene);
-  const snapSystem = useRef(new SnapSystem(snapConfig));
-
+  
+  // ============================================
+  // INICIALIZAÇÃO
+  // ============================================
+  
   useEffect(() => {
-    snapSystem.current.setConfig(snapConfig);
-    if (currentScene) {
-      snapSystem.current.setWalls(currentScene.walls);
-      snapSystem.current.setRooms(currentScene.rooms);
-      snapSystem.current.setFurniture(currentScene.furniture);
-    }
-  }, [snapConfig, currentScene]);
-
-  const screenToWorld = useCallback((screenX: number, screenY: number): Vec2 => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return [0, 0];
+    if (!canvasRef.current || !containerRef.current) return;
     
-    return [
-      (screenX - rect.left - offset.x - rect.width / 2) / scale,
-      -(screenY - rect.top - offset.y - rect.height / 2) / scale,
-    ];
-  }, [scale, offset]);
-
-  const worldToScreen = useCallback((worldX: number, worldY: number): Point => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return { x: 0, y: 0 };
-    
-    return {
-      x: worldX * scale + offset.x + rect.width / 2,
-      y: -worldY * scale + offset.y + rect.height / 2,
-    };
-  }, [scale, offset]);
-
-  const drawGrid = (ctx: CanvasRenderingContext2D, width: number, height: number) => {
-    if (!grid.visible) return;
-
-    const gridSpacing = scale * grid.size;
-    const startX = offset.x % gridSpacing;
-    const startY = offset.y % gridSpacing;
-
-    ctx.strokeStyle = grid.color;
-    ctx.globalAlpha = grid.opacity;
-    ctx.lineWidth = 1;
-
-    ctx.beginPath();
-    for (let x = startX; x < width; x += gridSpacing) {
-      ctx.moveTo(x, 0);
-      ctx.lineTo(x, height);
-    }
-    for (let y = startY; y < height; y += gridSpacing) {
-      ctx.moveTo(0, y);
-      ctx.lineTo(width, y);
-    }
-    ctx.stroke();
-
-    const centerX = width / 2 + offset.x;
-    const centerY = height / 2 + offset.y;
-
-    ctx.strokeStyle = '#3b82f6';
-    ctx.globalAlpha = 0.5;
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.moveTo(centerX, 0);
-    ctx.lineTo(centerX, height);
-    ctx.moveTo(0, centerY);
-    ctx.lineTo(width, centerY);
-    ctx.stroke();
-
-    ctx.globalAlpha = 1;
-  };
-
-  const drawWalls = (ctx: CanvasRenderingContext2D) => {
-    if (!currentScene) return;
-
-    currentScene.walls.forEach((wall) => {
-      const start = worldToScreen(wall.start[0], wall.start[1]);
-      const end = worldToScreen(wall.end[0], wall.end[1]);
-
-      const isSelected = selectedIds.includes(wall.id);
-      const isHovered = hoveredId === wall.id;
-
-      const thickness = Math.max(2, wall.thickness * scale);
-
-      ctx.strokeStyle = isSelected ? '#3b82f6' : isHovered ? '#60a5fa' : wall.color;
-      ctx.lineWidth = thickness;
-      ctx.lineCap = 'round';
-
-      ctx.beginPath();
-      ctx.moveTo(start.x, start.y);
-      ctx.lineTo(end.x, end.y);
-      ctx.stroke();
-
-      if (isSelected || isHovered) {
-        ctx.strokeStyle = '#3b82f6';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.beginPath();
-        ctx.moveTo(start.x, start.y);
-        ctx.lineTo(end.x, end.y);
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
-      ctx.fillStyle = isSelected ? '#3b82f6' : '#64748b';
-      ctx.beginPath();
-      ctx.arc(start.x, start.y, 4, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(end.x, end.y, 4, 0, Math.PI * 2);
-      ctx.fill();
-    });
-  };
-
-  const drawDoors = (ctx: CanvasRenderingContext2D) => {
-    if (!currentScene) return;
-
-    currentScene.doors.forEach((door) => {
-      const wall = currentScene.walls.find(w => w.id === door.wallId);
-      if (!wall) return;
-
-      const wallStart = worldToScreen(wall.start[0], wall.start[1]);
-      const wallEnd = worldToScreen(wall.end[0], wall.end[1]);
-
-      const wallLength = Math.sqrt(
-        Math.pow(wall.end[0] - wall.start[0], 2) +
-        Math.pow(wall.end[1] - wall.start[1], 2)
-      );
-
-      const doorStart = {
-        x: wallStart.x + (wallEnd.x - wallStart.x) * (door.position / wallLength),
-        y: wallStart.y + (wallEnd.y - wallStart.y) * (door.position / wallLength),
-      };
-
-      const doorEnd = {
-        x: wallStart.x + (wallEnd.x - wallStart.x) * ((door.position + door.width) / wallLength),
-        y: wallStart.y + (wallEnd.y - wallStart.y) * ((door.position + door.width) / wallLength),
-      };
-
-      ctx.strokeStyle = '#8B4513';
-      ctx.fillStyle = '#D2691E';
-      ctx.lineWidth = 2;
-
-      ctx.beginPath();
-      ctx.moveTo(doorStart.x, doorStart.y);
-      ctx.lineTo(doorEnd.x, doorEnd.y);
-      ctx.stroke();
-
-      const isSelected = selectedIds.includes(door.id);
-      if (isSelected) {
-        ctx.strokeStyle = '#3b82f6';
-        ctx.setLineDash([3, 3]);
-        ctx.strokeRect(
-          Math.min(doorStart.x, doorEnd.x) - 5,
-          Math.min(doorStart.y, doorEnd.y) - 5,
-          Math.abs(doorEnd.x - doorStart.x) + 10,
-          Math.abs(doorEnd.y - doorStart.y) + 10
-        );
-        ctx.setLineDash([]);
-      }
-    });
-  };
-
-  const drawWindows = (ctx: CanvasRenderingContext2D) => {
-    if (!currentScene) return;
-
-    currentScene.windows.forEach((window) => {
-      const wall = currentScene.walls.find(w => w.id === window.wallId);
-      if (!wall) return;
-
-      const wallStart = worldToScreen(wall.start[0], wall.start[1]);
-      const wallEnd = worldToScreen(wall.end[0], wall.end[1]);
-
-      const wallLength = Math.sqrt(
-        Math.pow(wall.end[0] - wall.start[0], 2) +
-        Math.pow(wall.end[1] - wall.start[1], 2)
-      );
-
-      const windowStart = {
-        x: wallStart.x + (wallEnd.x - wallStart.x) * (window.position / wallLength),
-        y: wallStart.y + (wallEnd.y - wallStart.y) * (window.position / wallLength),
-      };
-
-      const windowEnd = {
-        x: wallStart.x + (wallEnd.x - wallStart.x) * ((window.position + window.width) / wallLength),
-        y: wallStart.y + (wallEnd.y - wallStart.y) * ((window.position + window.width) / wallLength),
-      };
-
-      ctx.strokeStyle = '#87CEEB';
-      ctx.fillStyle = '#E0F6FF';
-      ctx.lineWidth = 3;
-
-      ctx.beginPath();
-      ctx.moveTo(windowStart.x, windowStart.y);
-      ctx.lineTo(windowEnd.x, windowEnd.y);
-      ctx.stroke();
-
-      ctx.fillStyle = 'rgba(135, 206, 235, 0.3)';
-      ctx.fillRect(
-        Math.min(windowStart.x, windowEnd.x) - 2,
-        Math.min(windowStart.y, windowEnd.y) - 2,
-        Math.abs(windowEnd.x - windowStart.x) + 4,
-        Math.abs(windowEnd.y - windowStart.y) + 4
-      );
-
-      const isSelected = selectedIds.includes(window.id);
-      if (isSelected) {
-        ctx.strokeStyle = '#3b82f6';
-        ctx.setLineDash([3, 3]);
-        ctx.strokeRect(
-          Math.min(windowStart.x, windowEnd.x) - 8,
-          Math.min(windowStart.y, windowEnd.y) - 8,
-          Math.abs(windowEnd.x - windowStart.x) + 16,
-          Math.abs(windowEnd.y - windowStart.y) + 16
-        );
-        ctx.setLineDash([]);
-      }
-    });
-  };
-
-  const drawRooms = (ctx: CanvasRenderingContext2D) => {
-    if (!currentScene) return;
-
-    currentScene.rooms.forEach((room) => {
-      if (room.points.length < 3) return;
-
-      ctx.fillStyle = room.floorColor + '40';
-      ctx.strokeStyle = room.wallColor;
-      ctx.lineWidth = 2;
-
-      ctx.beginPath();
-      const firstPoint = worldToScreen(room.points[0][0], room.points[0][1]);
-      ctx.moveTo(firstPoint.x, firstPoint.y);
-
-      for (let i = 1; i < room.points.length; i++) {
-        const point = worldToScreen(room.points[i][0], room.points[i][1]);
-        ctx.lineTo(point.x, point.y);
-      }
-
-      ctx.closePath();
-      ctx.fill();
-      ctx.stroke();
-
-      const center = room.points.reduce(
-        (acc, point) => ({ x: acc.x + point[0], y: acc.y + point[1] }),
-        { x: 0, y: 0 }
-      );
-      center.x /= room.points.length;
-      center.y /= room.points.length;
-
-      const screenCenter = worldToScreen(center.x, center.y);
-      ctx.fillStyle = '#64748b';
-      ctx.font = '12px Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(room.name, screenCenter.x, screenCenter.y);
-
-      if (room.area > 0) {
-        ctx.fillStyle = '#94a3b8';
-        ctx.font = '10px Inter, sans-serif';
-        ctx.fillText(`${room.area.toFixed(1)}m²`, screenCenter.x, screenCenter.y + 14);
-      }
-    });
-  };
-
-  const drawFurniture = (ctx: CanvasRenderingContext2D) => {
-    if (!currentScene) return;
-
-    currentScene.furniture.forEach((item) => {
-      const pos = worldToScreen(item.position[0], item.position[2]);
-      const width = item.dimensions.width * scale;
-      const depth = item.dimensions.depth * scale;
-
-      ctx.save();
-      ctx.translate(pos.x, pos.y);
-      ctx.rotate(-item.rotation[1]);
-
-      const isSelected = selectedIds.includes(item.id);
-
-      ctx.fillStyle = item.color;
-      ctx.strokeStyle = isSelected ? '#3b82f6' : '#475569';
-      ctx.lineWidth = isSelected ? 3 : 1;
-
-      ctx.fillRect(-width / 2, -depth / 2, width, depth);
-      ctx.strokeRect(-width / 2, -depth / 2, width, depth);
-
-      if (isSelected) {
-        ctx.strokeStyle = '#3b82f6';
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.strokeRect(-width / 2 - 5, -depth / 2 - 5, width + 10, depth + 10);
-        ctx.setLineDash([]);
-      }
-
-      ctx.fillStyle = '#ffffff';
-      ctx.beginPath();
-      ctx.moveTo(0, -depth / 2 + 5);
-      ctx.lineTo(-5, -depth / 2 + 15);
-      ctx.lineTo(5, -depth / 2 + 15);
-      ctx.closePath();
-      ctx.fill();
-
-      ctx.restore();
-    });
-  };
-
-  const drawMeasurements = (ctx: CanvasRenderingContext2D) => {
-    if (!currentScene) return;
-
-    currentScene.measurements.forEach((measurement) => {
-      const start = worldToScreen(measurement.start[0], measurement.start[1]);
-      const end = worldToScreen(measurement.end[0], measurement.end[1]);
-
-      ctx.strokeStyle = '#22c55e';
-      ctx.fillStyle = '#22c55e';
-      ctx.lineWidth = 1;
-
-      ctx.beginPath();
-      ctx.moveTo(start.x, start.y);
-      ctx.lineTo(end.x, end.y);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.arc(start.x, start.y, 3, 0, Math.PI * 2);
-      ctx.fill();
-      ctx.beginPath();
-      ctx.arc(end.x, end.y, 3, 0, Math.PI * 2);
-      ctx.fill();
-
-      const midX = (start.x + end.x) / 2;
-      const midY = (start.y + end.y) / 2;
-
-      ctx.fillStyle = '#22c55e';
-      ctx.font = 'bold 11px Inter, sans-serif';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${measurement.value.toFixed(2)}${measurement.unit}`, midX, midY - 5);
-    });
-  };
-
-  const drawCurrentLine = (ctx: CanvasRenderingContext2D) => {
-    if (!isDrawing || !drawStart) return;
-
-    const start = worldToScreen(drawStart.x, drawStart.y);
-    const end = worldToScreen(mousePos.x, mousePos.y);
-
-    ctx.strokeStyle = '#3b82f6';
-    ctx.lineWidth = 3;
-    ctx.setLineDash([5, 5]);
-
-    ctx.beginPath();
-    ctx.moveTo(start.x, start.y);
-    ctx.lineTo(end.x, end.y);
-    ctx.stroke();
-
-    ctx.setLineDash([]);
-
-    const distance = Math.sqrt(
-      Math.pow(mousePos.x - drawStart.x, 2) +
-      Math.pow(mousePos.y - drawStart.y, 2)
-    );
-
-    ctx.fillStyle = '#3b82f6';
-    ctx.font = 'bold 12px Inter, sans-serif';
-    ctx.textAlign = 'center';
-    ctx.fillText(
-      `${distance.toFixed(2)}m`,
-      (start.x + end.x) / 2,
-      (start.y + end.y) / 2 - 10
-    );
-  };
-
-  const drawSnapIndicator = (ctx: CanvasRenderingContext2D) => {
-    if (tool !== 'wall' && tool !== 'room' && tool !== 'door' && tool !== 'window') return;
-
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const worldPos = screenToWorld(
-      (canvasRef.current?.width || 0) / 2 + offset.x + mousePos.x * scale,
-      (canvasRef.current?.height || 0) / 2 + offset.y - mousePos.y * scale
-    );
-
-    const snapResult = snapSystem.current.snap(worldPos);
-    
-    if (snapResult.type !== 'none') {
-      const screenPos = worldToScreen(snapResult.point[0], snapResult.point[1]);
-      
-      ctx.strokeStyle = '#22c55e';
-      ctx.fillStyle = '#22c55e';
-      ctx.lineWidth = 2;
-
-      switch (snapResult.type) {
-        case 'endpoint':
-          ctx.strokeRect(screenPos.x - 6, screenPos.y - 6, 12, 12);
-          break;
-        case 'midpoint':
-          ctx.beginPath();
-          ctx.moveTo(screenPos.x, screenPos.y - 8);
-          ctx.lineTo(screenPos.x + 7, screenPos.y + 4);
-          ctx.lineTo(screenPos.x - 7, screenPos.y + 4);
-          ctx.closePath();
-          ctx.stroke();
-          break;
-        case 'center':
-          ctx.beginPath();
-          ctx.arc(screenPos.x, screenPos.y, 8, 0, Math.PI * 2);
-          ctx.stroke();
-          break;
-        default:
-          ctx.beginPath();
-          ctx.arc(screenPos.x, screenPos.y, 4, 0, Math.PI * 2);
-          ctx.fill();
-      }
-    }
-  };
-
-  const render = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-    drawGrid(ctx, canvas.width, canvas.height);
-    drawRooms(ctx);
-    drawWalls(ctx);
-    drawDoors(ctx);
-    drawWindows(ctx);
-    drawFurniture(ctx);
-    drawMeasurements(ctx);
-    drawCurrentLine(ctx);
-    drawSnapIndicator(ctx);
-  }, [drawGrid, drawRooms, drawWalls, drawDoors, drawWindows, drawFurniture, drawMeasurements, drawCurrentLine, drawSnapIndicator]);
-
-  useEffect(() => {
-    const handleResize = () => {
-      const canvas = canvasRef.current;
-      const container = containerRef.current;
-      if (!canvas || !container) return;
-
-      canvas.width = container.clientWidth;
-      canvas.height = container.clientHeight;
-      render();
-    };
-
-    handleResize();
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, [render]);
-
-  useEffect(() => {
-    let animationId: number;
+    const container = containerRef.current;
     
-    const animate = () => {
-      render();
-      animationId = requestAnimationFrame(animate);
+    // Setup canvas size com DPR para retina
+    const dpr = window.devicePixelRatio || 1;
+    const rect = container.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width = `${rect.width}px`;
+    canvas.style.height = `${rect.height}px`;
+    
+    const ctx = canvas.getContext('2d');
+    if (ctx) ctx.scale(dpr, dpr);
+    
+    // Configurar engines com dados do store
+    cameraRef.current.setState({
+      position: [0, 10, 10],
+      target: [0, 0, 0],
+      zoom: 1
+    });
+    
+    gridRef.current.setConfig({
+      visible: gridConfig.visible,
+      size: gridConfig.size,
+      subdivisions: gridConfig.subdivisions,
+      majorColor: gridConfig.color,
+      opacity: gridConfig.opacity
+    });
+    
+    snapRef.current.setConfig({
+      enabled: snapConfig.enabled,
+      gridSize: snapConfig.gridSize,
+      snapDistance: snapConfig.snapDistance,
+      angleSnap: snapConfig.angleSnap
+    });
+    
+    // Atualizar dados do snap engine
+    if (currentScene) {
+      snapRef.current.setWalls(currentScene.walls);
+      snapRef.current.setRooms(currentScene.rooms);
+      snapRef.current.setFurniture(currentScene.furniture);
+    }
+    
+    // Attach interaction engine ao canvas
+    interactionRef.current.attach(canvas);
+    setupInteractionHandlers();
+    
+    setIsReady(true);
+    
+    return () => {
+      interactionRef.current.detach();
+      cancelAnimationFrame(animationRef.current);
     };
-
-    animate();
-    return () => cancelAnimationFrame(animationId);
-  }, [render]);
-
-  const handleMouseDown = (e: React.MouseEvent) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (e.button === 1 || (e.button === 0 && e.shiftKey)) {
-      setIsPanning(true);
-      setPanStart({ x: e.clientX - offset.x, y: e.clientY - offset.y });
-      return;
+  }, []);
+  
+  // Atualizar configurações quando mudam no store
+  useEffect(() => {
+    gridRef.current.setConfig({
+      visible: gridConfig.visible,
+      size: gridConfig.size,
+      subdivisions: gridConfig.subdivisions,
+      majorColor: gridConfig.color,
+      opacity: gridConfig.opacity
+    });
+  }, [gridConfig]);
+  
+  useEffect(() => {
+    snapRef.current.setConfig({
+      enabled: snapConfig.enabled,
+      gridSize: snapConfig.gridSize,
+      snapDistance: snapConfig.snapDistance,
+      angleSnap: snapConfig.angleSnap
+    });
+  }, [snapConfig]);
+  
+  useEffect(() => {
+    if (currentScene) {
+      snapRef.current.setWalls(currentScene.walls);
+      snapRef.current.setRooms(currentScene.rooms);
+      snapRef.current.setFurniture(currentScene.furniture);
     }
-
-    if ((tool === 'wall' || tool === 'door' || tool === 'window') && e.button === 0) {
-      const worldPos = screenToWorld(x, y);
-      const snapResult = snapSystem.current.snap(worldPos);
+  }, [currentScene]);
+  
+  // ============================================
+  // HANDLERS DE INTERAÇÃO (Mouse + Touch)
+  // ============================================
+  
+  const setupInteractionHandlers = useCallback(() => {
+    const interaction = interactionRef.current;
+    
+    // PAN - Mouse move com middle button ou shift+left
+    interaction.on('mousemove', (event) => {
+      const state = interaction.getState();
       
-      setIsDrawing(true);
-      setDrawStart({ x: snapResult.point[0], y: snapResult.point[1] });
-      setMousePos({ x: snapResult.point[0], y: snapResult.point[1] });
-    }
-
-    if (tool === 'select' && e.button === 0) {
-      const worldPos = screenToWorld(x, y);
-      
-      let foundId: string | null = null;
-      const clickRadius = 10 / scale;
-
-      currentScene?.walls.forEach(wall => {
-        const dist = pointToLineDistance(
-          worldPos[0], worldPos[1],
-          wall.start[0], wall.start[1],
-          wall.end[0], wall.end[1]
-        );
-        if (dist < clickRadius) {
-          foundId = wall.id;
-        }
-      });
-
-      if (foundId) {
-        select(foundId, e.ctrlKey || e.metaKey);
-      } else if (!e.ctrlKey && !e.metaKey) {
-        select([]);
+      if (state.isDragging && (state.activeButton === 'middle' || state.modifiers.has('shift'))) {
+        const delta: Vec2 = [-(event.delta?.[0] || 0), event.delta?.[1] || 0];
+        cameraRef.current.pan(delta);
+        return false;
       }
-    }
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    if (isPanning) {
-      setOffset({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y,
-      });
-      return;
-    }
-
-    if (isDrawing && drawStart) {
-      const worldPos = screenToWorld(x, y);
-      const snapResult = snapSystem.current.snap(worldPos);
-      setMousePos({ x: snapResult.point[0], y: snapResult.point[1] });
-    }
-
-    const worldPos = screenToWorld(x, y);
-    let foundHover: string | null = null;
-    const hoverRadius = 8 / scale;
-
-    currentScene?.walls.forEach(wall => {
+      
+      // Hover detection apenas se não estiver desenhando
+      if (!isDrawing) {
+        updateHover(event.position);
+      }
+      
+      // Atualizar posição do mouse para desenho
+      if (isDrawing && drawStart) {
+        const worldPos = screenToWorld(event.position[0], event.position[1]);
+        const snapResult = snapRef.current.snap(worldPos);
+        // Trigger re-render para mostrar linha preview
+      }
+      
+      return true;
+    });
+    
+    // WHEEL - Zoom com centro no mouse
+    interaction.on('wheel', (event) => {
+      const zoomFactor = event.delta && event.delta[1] > 0 ? 0.9 : 1.1;
+      const currentZoom = cameraRef.current.getState().zoom;
+      cameraRef.current.setZoom(currentZoom * zoomFactor);
+      return false;
+    });
+    
+    // CLICK - Seleção ou início de ferramenta
+    interaction.on('click', (event) => {
+      if (tool === 'select') {
+        handleSelection(event.position, interaction.getState().modifiers.has('ctrl'));
+      }
+      return true;
+    });
+    
+    // MOUSE DOWN - Início de desenho ou pan
+    interaction.on('mousedown', (event) => {
+      if (tool === 'wall' && event.button === 'left' && !interaction.getState().modifiers.has('shift')) {
+        const worldPos = screenToWorld(event.position[0], event.position[1]);
+        const snapResult = snapRef.current.snap(worldPos);
+        setDrawStart(snapResult.point);
+        setIsDrawing(true);
+        snapRef.current.setLastPoint(snapResult.point);
+      }
+      return true;
+    });
+    
+    // MOUSE UP - Finalização de desenho
+    interaction.on('mouseup', (event) => {
+      if (isDrawing && tool === 'wall' && drawStart) {
+        const worldPos = screenToWorld(event.position[0], event.position[1]);
+        const snapResult = snapRef.current.snap(worldPos);
+        
+        // Verificar distância mínima
+        const dist = Math.sqrt(
+          Math.pow(snapResult.point[0] - drawStart[0], 2) +
+          Math.pow(snapResult.point[1] - drawStart[1], 2)
+        );
+        
+        if (dist > 0.1) {
+          // Criar parede via engine
+          const wall = wallRef.current.createWall(drawStart, snapResult.point, {
+            thickness: 0.2,
+            height: 2.8,
+            color: '#475569'
+          });
+          
+          if (wall) {
+            addWall(wall);
+          }
+        }
+        
+        setIsDrawing(false);
+        setDrawStart(null);
+      }
+      return true;
+    });
+    
+    // KEYBOARD - Atalhos
+    interaction.on('keydown', (event) => {
+      switch (event.key) {
+        case 'Delete':
+        case 'Backspace':
+          // Deletar seleção
+          break;
+        case 'Escape':
+          setIsDrawing(false);
+          setDrawStart(null);
+          break;
+      }
+      return true;
+    });
+  }, [tool, isDrawing, drawStart]);
+  
+  // ============================================
+  // FUNÇÕES AUXILIARES
+  // ============================================
+  
+  const screenToWorld = useCallback((screenX: number, screenY: number): Vec2 => {
+    const canvas = canvasRef.current;
+    if (!canvas) return [0, 0];
+    
+    const rect = canvas.getBoundingClientRect();
+    const camera = cameraRef.current;
+    const state = camera.getState();
+    
+    // Ajustar para coordenadas relativas ao canvas
+    const x = screenX - rect.left;
+    const y = screenY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    // Converter para mundo (inverter Y para coordenadas CAD)
+    const worldX = (x - centerX) / (state.zoom * 20) - state.position[0];
+    const worldY = -(y - centerY) / (state.zoom * 20) - state.position[2];
+    
+    return [worldX, worldY];
+  }, []);
+  
+  const worldToScreen = useCallback((worldX: number, worldY: number): Vec2 => {
+    const canvas = canvasRef.current;
+    if (!canvas) return [0, 0];
+    
+    const rect = canvas.getBoundingClientRect();
+    const camera = cameraRef.current;
+    const state = camera.getState();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    const screenX = (worldX + state.position[0]) * state.zoom * 20 + centerX;
+    const screenY = -(worldY + state.position[2]) * state.zoom * 20 + centerY;
+    
+    return [screenX, screenY];
+  }, []);
+  
+  const updateHover = useCallback((screenPos: Vec2) => {
+    const worldPos = screenToWorld(screenPos[0], screenPos[1]);
+    
+    // Hit test usando wall engine
+    const walls = currentScene?.walls || [];
+    let foundId: string | null = null;
+    const threshold = 0.3; // 30cm
+    
+    for (const wall of walls) {
       const dist = pointToLineDistance(
         worldPos[0], worldPos[1],
         wall.start[0], wall.start[1],
         wall.end[0], wall.end[1]
       );
-      if (dist < hoverRadius) {
-        foundHover = wall.id;
+      if (dist < threshold) {
+        foundId = wall.id;
+        break;
       }
-    });
-
-    setHoveredId(foundHover);
-  };
-
-  const handleMouseUp = (e: React.MouseEvent) => {
-    if (isPanning) {
-      setIsPanning(false);
-      return;
     }
-
-    if (isDrawing && drawStart) {
-      const distance = Math.sqrt(
-        Math.pow(mousePos.x - drawStart.x, 2) +
-        Math.pow(mousePos.y - drawStart.y, 2)
+    
+    setHoveredId(foundId);
+  }, [currentScene, screenToWorld]);
+  
+  const handleSelection = useCallback((screenPos: Vec2, multiSelect: boolean) => {
+    const worldPos = screenToWorld(screenPos[0], screenPos[1]);
+    
+    const walls = currentScene?.walls || [];
+    let foundId: string | null = null;
+    const threshold = 0.3;
+    
+    for (const wall of walls) {
+      const dist = pointToLineDistance(
+        worldPos[0], worldPos[1],
+        wall.start[0], wall.start[1],
+        wall.end[0], wall.end[1]
       );
-
-      if (distance > 0.1) {
-        if (tool === 'wall') {
-          addWall(
-            [drawStart.x, drawStart.y],
-            [mousePos.x, mousePos.y]
-          );
-        }
+      if (dist < threshold) {
+        foundId = wall.id;
+        break;
       }
-
-      setIsDrawing(false);
-      setDrawStart(null);
     }
-  };
-
-  const handleWheel = (e: React.WheelEvent) => {
+    
+    if (foundId) {
+      select(foundId, multiSelect);
+    } else if (!multiSelect) {
+      select([]);
+    }
+  }, [currentScene, select, screenToWorld]);
+  
+  // ============================================
+  // TOUCH EVENTS (Mobile Premium)
+  // ============================================
+  
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
     e.preventDefault();
     
-    const zoomFactor = e.deltaY > 0 ? 0.9 : 1.1;
-    setScale(prev => Math.max(5, Math.min(100, prev * zoomFactor)));
+    if (e.touches.length === 1) {
+      // Single touch - tratado como mouse
+      const touch = e.touches[0];
+      touchStateRef.current.lastTouch = [touch.clientX, touch.clientY];
+      
+      // Simular mousedown
+      const mouseEvent = new MouseEvent('mousedown', {
+        clientX: touch.clientX,
+        clientY: touch.clientY,
+        button: 0
+      });
+      canvasRef.current?.dispatchEvent(mouseEvent);
+      
+    } else if (e.touches.length === 2) {
+      // Pinch zoom start
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.sqrt(
+        Math.pow(touch2.clientX - touch1.clientX, 2) +
+        Math.pow(touch2.clientY - touch1.clientY, 2)
+      );
+      
+      touchStateRef.current.isPinching = true;
+      touchStateRef.current.startDistance = distance;
+      touchStateRef.current.startZoom = cameraRef.current.getState().zoom;
+    }
+  }, []);
+  
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    
+    if (e.touches.length === 1 && !touchStateRef.current.isPinching) {
+      // Pan ou draw
+      const touch = e.touches[0];
+      
+      if (touchStateRef.current.lastTouch) {
+        const deltaX = touch.clientX - touchStateRef.current.lastTouch[0];
+        const deltaY = touch.clientY - touchStateRef.current.lastTouch[1];
+        
+        // Se estiver desenhando, simular mousemove
+        if (isDrawing) {
+          const mouseEvent = new MouseEvent('mousemove', {
+            clientX: touch.clientX,
+            clientY: touch.clientY
+          });
+          canvasRef.current?.dispatchEvent(mouseEvent);
+        } else {
+          // Pan com dois dedos ou modo pan ativo
+          cameraRef.current.pan([-deltaX, deltaY]);
+        }
+      }
+      
+      touchStateRef.current.lastTouch = [touch.clientX, touch.clientY];
+      
+    } else if (e.touches.length === 2 && touchStateRef.current.isPinching) {
+      // Pinch zoom
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+      const distance = Math.sqrt(
+        Math.pow(touch2.clientX - touch1.clientX, 2) +
+        Math.pow(touch2.clientY - touch1.clientY, 2)
+      );
+      
+      const scale = distance / touchStateRef.current.startDistance;
+      const newZoom = touchStateRef.current.startZoom * scale;
+      cameraRef.current.setZoom(newZoom);
+    }
+  }, [isDrawing]);
+  
+  const handleTouchEnd = useCallback((e: React.TouchEvent) => {
+    e.preventDefault();
+    
+    if (touchStateRef.current.isPinching && e.touches.length < 2) {
+      touchStateRef.current.isPinching = false;
+    }
+    
+    if (e.touches.length === 0) {
+      // Simular mouseup
+      const mouseEvent = new MouseEvent('mouseup', { button: 0 });
+      canvasRef.current?.dispatchEvent(mouseEvent);
+      touchStateRef.current.lastTouch = null;
+    }
+  }, []);
+  
+  // ============================================
+  // RENDER LOOP
+  // ============================================
+  
+  const render = useCallback(() => {
+    const canvas = canvasRef.current;
+    const ctx = canvas?.getContext('2d');
+    if (!canvas || !ctx || !isReady) return;
+    
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    
+    // Clear
+    ctx.clearRect(0, 0, rect.width * dpr, rect.height * dpr);
+    
+    const cameraState = cameraRef.current.getState();
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    
+    // Calcular bounds visíveis para o grid
+    const visibleWidth = rect.width / (cameraState.zoom * 20);
+    const visibleHeight = rect.height / (cameraState.zoom * 20);
+    const viewBounds = {
+      min: [-visibleWidth / 2 - cameraState.position[0], -visibleHeight / 2 - cameraState.position[2]] as Vec2,
+      max: [visibleWidth / 2 - cameraState.position[0], visibleHeight / 2 - cameraState.position[2]] as Vec2
+    };
+    
+    ctx.save();
+    
+    // Render grid (delegado para GridEngine)
+    ctx.translate(centerX, centerY);
+    ctx.scale(cameraState.zoom * 20, -cameraState.zoom * 20); // Y invertido para CAD
+    ctx.translate(cameraState.position[0], cameraState.position[2]);
+    
+    gridRef.current.render(ctx, viewBounds, cameraState.zoom, [0, 0]);
+    
+    ctx.restore();
+    
+    // Render cena
+    if (currentScene) {
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.scale(cameraState.zoom * 20, -cameraState.zoom * 20);
+      ctx.translate(cameraState.position[0], cameraState.position[2]);
+      
+      // Render rooms (delegado para RoomEngine)
+      roomRef.current.render(ctx, currentScene.rooms, selectedIds);
+      
+      // Render walls (delegado para WallEngine)
+      wallRef.current.render(ctx, currentScene.walls, selectedIds, hoveredId);
+      
+      // Render doors
+      currentScene.doors?.forEach(door => {
+        const wall = currentScene.walls.find(w => w.id === door.wallId);
+        if (wall) renderDoor(ctx, door, wall);
+      });
+      
+      // Render windows
+      currentScene.windows?.forEach(window => {
+        const wall = currentScene.walls.find(w => w.id === window.wallId);
+        if (wall) renderWindow(ctx, window, wall);
+      });
+      
+      // Render furniture
+      currentScene.furniture?.forEach(item => {
+        renderFurniture(ctx, item, selectedIds.includes(item.id));
+      });
+      
+      ctx.restore();
+    }
+    
+    // Render preview de desenho (wall sendo desenhada)
+    if (isDrawing && drawStart && tool === 'wall') {
+      const mousePos = interactionRef.current.getMousePosition();
+      const currentWorld = screenToWorld(mousePos[0], mousePos[1]);
+      const snapResult = snapRef.current.snap(currentWorld);
+      
+      ctx.save();
+      ctx.translate(centerX, centerY);
+      ctx.scale(cameraState.zoom * 20, -cameraState.zoom * 20);
+      ctx.translate(cameraState.position[0], cameraState.position[2]);
+      
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 0.02;
+      ctx.setLineDash([0.1, 0.1]);
+      ctx.beginPath();
+      ctx.moveTo(drawStart[0], drawStart[1]);
+      ctx.lineTo(snapResult.point[0], snapResult.point[1]);
+      ctx.stroke();
+      
+      // Mostrar distância
+      const dist = Math.sqrt(
+        Math.pow(snapResult.point[0] - drawStart[0], 2) +
+        Math.pow(snapResult.point[1] - drawStart[1], 2)
+      );
+      
+      ctx.fillStyle = '#3b82f6';
+      ctx.font = '0.15px Inter';
+      ctx.textAlign = 'center';
+      ctx.fillText(
+        `${dist.toFixed(2)}m`,
+        (drawStart[0] + snapResult.point[0]) / 2,
+        (drawStart[1] + snapResult.point[1]) / 2 + 0.2
+      );
+      
+      ctx.restore();
+    }
+    
+    // Render snap indicator
+    if (tool !== 'select') {
+      const mousePos = interactionRef.current.getMousePosition();
+      const worldPos = screenToWorld(mousePos[0], mousePos[1]);
+      const snapResult = snapRef.current.snap(worldPos);
+      
+      if (snapResult.type !== 'none') {
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.scale(cameraState.zoom * 20, -cameraState.zoom * 20);
+        ctx.translate(cameraState.position[0], cameraState.position[2]);
+        
+        renderSnapIndicator(ctx, snapResult);
+        
+        ctx.restore();
+      }
+    }
+    
+    animationRef.current = requestAnimationFrame(render);
+  }, [isReady, currentScene, selectedIds, hoveredId, tool, isDrawing, drawStart, screenToWorld]);
+  
+  useEffect(() => {
+    if (isReady) {
+      animationRef.current = requestAnimationFrame(render);
+    }
+    return () => cancelAnimationFrame(animationRef.current);
+  }, [isReady, render]);
+  
+  // ============================================
+  // FUNÇÕES DE RENDER AUXILIARES
+  // ============================================
+  
+  const renderDoor = (ctx: CanvasRenderingContext2D, door: any, wall: any) => {
+    const wallDir = [wall.end[0] - wall.start[0], wall.end[1] - wall.start[1]];
+    const wallLen = Math.sqrt(wallDir[0] * wallDir[0] + wallDir[1] * wallDir[1]);
+    const wallUnit = [wallDir[0] / wallLen, wallDir[1] / wallLen];
+    
+    const doorStart = [
+      wall.start[0] + wallUnit[0] * door.position,
+      wall.start[1] + wallUnit[1] * door.position
+    ];
+    const doorEnd = [
+      doorStart[0] + wallUnit[0] * door.width,
+      doorStart[1] + wallUnit[1] * door.width
+    ];
+    
+    ctx.strokeStyle = '#8B4513';
+    ctx.fillStyle = '#D2691E';
+    ctx.lineWidth = 0.05;
+    
+    ctx.beginPath();
+    ctx.moveTo(doorStart[0], doorStart[1]);
+    ctx.lineTo(doorEnd[0], doorEnd[1]);
+    ctx.stroke();
+    
+    // Arco de abertura
+    ctx.beginPath();
+    ctx.arc(doorStart[0], doorStart[1], door.width, 
+      Math.atan2(wallUnit[1], wallUnit[0]), 
+      Math.atan2(wallUnit[1], wallUnit[0]) + Math.PI / 2
+    );
+    ctx.stroke();
   };
-
+  
+  const renderWindow = (ctx: CanvasRenderingContext2D, window: any, wall: any) => {
+    const wallDir = [wall.end[0] - wall.start[0], wall.end[1] - wall.start[1]];
+    const wallLen = Math.sqrt(wallDir[0] * wallDir[0] + wallDir[1] * wallDir[1]);
+    const wallUnit = [wallDir[0] / wallLen, wallDir[1] / wallLen];
+    
+    const winStart = [
+      wall.start[0] + wallUnit[0] * window.position,
+      wall.start[1] + wallUnit[1] * window.position
+    ];
+    const winEnd = [
+      winStart[0] + wallUnit[0] * window.width,
+      winStart[1] + wallUnit[1] * window.width
+    ];
+    
+    ctx.strokeStyle = '#87CEEB';
+    ctx.fillStyle = 'rgba(135, 206, 235, 0.3)';
+    ctx.lineWidth = 0.08;
+    
+    ctx.beginPath();
+    ctx.moveTo(winStart[0], winStart[1]);
+    ctx.lineTo(winEnd[0], winEnd[1]);
+    ctx.stroke();
+    
+    // Linhas de vidro
+    ctx.lineWidth = 0.02;
+    ctx.setLineDash([0.05, 0.05]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  };
+  
+  const renderFurniture = (ctx: CanvasRenderingContext2D, item: any, isSelected: boolean) => {
+    const x = item.position[0];
+    const y = item.position[2];
+    const width = item.dimensions.width;
+    const depth = item.dimensions.depth;
+    const rotation = item.rotation[1];
+    
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(-rotation);
+    
+    ctx.fillStyle = item.color;
+    ctx.strokeStyle = isSelected ? '#3b82f6' : '#475569';
+    ctx.lineWidth = isSelected ? 0.03 : 0.02;
+    
+    ctx.fillRect(-width / 2, -depth / 2, width, depth);
+    ctx.strokeRect(-width / 2, -depth / 2, width, depth);
+    
+    // Indicador de frente
+    ctx.fillStyle = '#ffffff';
+    ctx.beginPath();
+    ctx.moveTo(0, -depth / 2 + 0.05);
+    ctx.lineTo(-0.05, -depth / 2 + 0.15);
+    ctx.lineTo(0.05, -depth / 2 + 0.15);
+    ctx.closePath();
+    ctx.fill();
+    
+    if (isSelected) {
+      ctx.strokeStyle = '#3b82f6';
+      ctx.lineWidth = 0.02;
+      ctx.setLineDash([0.05, 0.05]);
+      ctx.strokeRect(-width / 2 - 0.05, -depth / 2 - 0.05, width + 0.1, depth + 0.1);
+      ctx.setLineDash([]);
+    }
+    
+    ctx.restore();
+  };
+  
+  const renderSnapIndicator = (ctx: CanvasRenderingContext2D, snapResult: any) => {
+    ctx.strokeStyle = '#22c55e';
+    ctx.fillStyle = '#22c55e';
+    ctx.lineWidth = 0.02;
+    
+    const pos = snapResult.point;
+    
+    switch (snapResult.type) {
+      case 'endpoint':
+        ctx.strokeRect(pos[0] - 0.15, pos[1] - 0.15, 0.3, 0.3);
+        break;
+      case 'midpoint':
+        ctx.beginPath();
+        ctx.moveTo(pos[0], pos[1] - 0.2);
+        ctx.lineTo(pos[0] + 0.17, pos[1] + 0.1);
+        ctx.lineTo(pos[0] - 0.17, pos[1] + 0.1);
+        ctx.closePath();
+        ctx.stroke();
+        break;
+      case 'center':
+        ctx.beginPath();
+        ctx.arc(pos[0], pos[1], 0.2, 0, Math.PI * 2);
+        ctx.stroke();
+        break;
+      case 'grid':
+        ctx.beginPath();
+        ctx.arc(pos[0], pos[1], 0.1, 0, Math.PI * 2);
+        ctx.fill();
+        break;
+      default:
+        ctx.beginPath();
+        ctx.arc(pos[0], pos[1], 0.08, 0, Math.PI * 2);
+        ctx.fill();
+    }
+  };
+  
+  // ============================================
+  // UTILS
+  // ============================================
+  
   const pointToLineDistance = (px: number, py: number, x1: number, y1: number, x2: number, y2: number): number => {
     const A = px - x1;
     const B = py - y1;
     const C = x2 - x1;
     const D = y2 - y1;
-
+    
     const dot = A * C + B * D;
     const lenSq = C * C + D * D;
     let param = -1;
-
-    if (lenSq !== 0) {
-      param = dot / lenSq;
-    }
-
+    
+    if (lenSq !== 0) param = dot / lenSq;
+    
     let xx, yy;
-
-    if (param < 0) {
-      xx = x1;
-      yy = y1;
-    } else if (param > 1) {
-      xx = x2;
-      yy = y2;
-    } else {
-      xx = x1 + param * C;
-      yy = y1 + param * D;
-    }
-
+    if (param < 0) { xx = x1; yy = y1; }
+    else if (param > 1) { xx = x2; yy = y2; }
+    else { xx = x1 + param * C; yy = y1 + param * D; }
+    
     const dx = px - xx;
     const dy = py - yy;
-
     return Math.sqrt(dx * dx + dy * dy);
   };
-
+  
+  // ============================================
+  // RESIZE HANDLER
+  // ============================================
+  
+  useEffect(() => {
+    const handleResize = () => {
+      if (!canvasRef.current || !containerRef.current) return;
+      
+      const canvas = canvasRef.current;
+      const container = containerRef.current;
+      const dpr = window.devicePixelRatio || 1;
+      const rect = container.getBoundingClientRect();
+      
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      canvas.style.width = `${rect.width}px`;
+      canvas.style.height = `${rect.height}px`;
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.scale(dpr, dpr);
+    };
+    
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+  
+  const cameraState = cameraRef.current?.getState();
+  
   return (
-    <div ref={containerRef} className="w-full h-full relative">
+    <div 
+      ref={containerRef}
+      className={`relative w-full h-full overflow-hidden bg-slate-950 ${className}`}
+      style={{ touchAction: 'none' }}
+    >
       <canvas
         ref={canvasRef}
-        className={`w-full h-full ${isPanning ? 'cursor-grabbing' : 'cursor-crosshair'}`}
-        onMouseDown={handleMouseDown}
-        onMouseMove={handleMouseMove}
-        onMouseUp={handleMouseUp}
-        onMouseLeave={() => setIsPanning(false)}
-        onWheel={handleWheel}
+        className="block w-full h-full cursor-crosshair touch-none"
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+        onTouchCancel={handleTouchEnd}
+        style={{ touchAction: 'none' }}
       />
       
-      <div className="absolute bottom-4 right-4 flex flex-col gap-2">
-        <button
-          onClick={() => setScale(s => Math.min(100, s * 1.2))}
-          className="w-10 h-10 bg-slate-800 hover:bg-slate-700 rounded-lg flex items-center justify-center text-slate-300 shadow-lg"
-        >
-          +
-        </button>
-        <button
-          onClick={() => setScale(s => Math.max(5, s / 1.2))}
-          className="w-10 h-10 bg-slate-800 hover:bg-slate-700 rounded-lg flex items-center justify-center text-slate-300 shadow-lg"
-        >
-          -
-        </button>
-        <button
-          onClick={() => { setScale(20); setOffset({ x: 0, y: 0 }); }}
-          className="w-10 h-10 bg-slate-800 hover:bg-slate-700 rounded-lg flex items-center justify-center text-slate-300 shadow-lg"
-        >
-          ⌖
-        </button>
+      {/* Info Overlay - Premium */}
+      <div className="absolute bottom-4 left-4 bg-slate-900/90 backdrop-blur-md text-slate-300 text-xs px-4 py-3 rounded-xl border border-slate-700/50 pointer-events-none select-none shadow-2xl">
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col">
+            <span className="text-slate-500 text-[10px] uppercase tracking-wider">Escala</span>
+            <span className="font-mono text-slate-200">1:{(100 / (cameraState?.zoom || 1)).toFixed(0)}</span>
+          </div>
+          <div className="w-px h-8 bg-slate-700" />
+          <div className="flex flex-col">
+            <span className="text-slate-500 text-[10px] uppercase tracking-wider">Zoom</span>
+            <span className="font-mono text-slate-200">{((cameraState?.zoom || 1) * 100).toFixed(0)}%</span>
+          </div>
+          <div className="w-px h-8 bg-slate-700" />
+          <div className="flex flex-col">
+            <span className="text-slate-500 text-[10px] uppercase tracking-wider">Ferramenta</span>
+            <span className="font-medium text-blue-400 capitalize">{tool}</span>
+          </div>
+        </div>
       </div>
-
-      <div className="absolute bottom-4 left-4 bg-slate-800 px-3 py-1.5 rounded-lg text-xs text-slate-300 shadow-lg">
-        Escala: 1:{(100 / scale).toFixed(0)} | {scale.toFixed(0)} px/m
-      </div>
+      
+      {/* Snap Indicator Badge */}
+      {tool !== 'select' && (
+        <div className="absolute top-4 left-4 bg-green-500/10 backdrop-blur-sm text-green-400 text-xs px-3 py-1.5 rounded-full border border-green-500/20 pointer-events-none">
+          Snap Ativo
+        </div>
+      )}
     </div>
   );
-}
+};
+
+export default Canvas2D;

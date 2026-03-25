@@ -4,9 +4,9 @@
 // ============================================
 
 import { useCallback } from 'react';
-import { useEditorStore } from '../../store/editorStore';
-import type { EditorState } from '../../store/editorStore';
-import type { Wall, Room } from '../../types';
+import { useEditorStore } from '../store';
+import type { EditorState } from '../store';
+import type { Wall, Room } from '@types';
 
 // ============================================
 // TIPOS AUXILIARES

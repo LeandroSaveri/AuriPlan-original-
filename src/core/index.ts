@@ -1,17 +1,41 @@
 // ============================================
-// CORE INDEX - Exportação de Core Engines
+// Core Module Exports
 // ============================================
 
+// Math & Geometry
 export * from './math/vector';
-export { SnapEngine } from './snap/SnapEngine';
+export * from './math/geometry';
+
+// Snap System
 export { SnapSystem } from './snap/SnapSystem';
-export { HistoryEngine } from './history/HistoryEngine';
+export { SnapRenderer } from './snap/SnapRenderer';
+export type { SnapIndicator } from './snap/SnapRenderer';
+
+// Grid
+export { GridRenderer } from './grid/GridRenderer';
+
+// Camera/Viewport
+export { CameraRenderer } from './camera/CameraRenderer';
+
+// Interaction
+export { InteractionRenderer } from './interaction/InteractionRenderer';
+export type { Handle } from './interaction/InteractionRenderer';
+
+// Collision
+export { CollisionRenderer } from './collision/CollisionRenderer';
+
+// Wall
+export { WallRenderer } from './wall/WallRenderer';
+
+// Room
+export { RoomRenderer } from './room/RoomRenderer';
+
+// History
 export { HistoryManager } from './history/HistoryManager';
-export { WallEngine } from './wall/WallEngine';
-export { RoomEngine } from './room/RoomEngine';
-export { CollisionEngine } from './collision/CollisionEngine';
-export { CameraEngine } from './camera/CameraEngine';
-export { GridEngine } from './grid/GridEngine';
-export { InteractionEngine } from './interaction/InteractionEngine';
-export { ExportEngine } from './export/ExportEngine';
+
+// Project
+export { ProjectManager } from './project/ProjectManager';
+
+// Import/Export
 export { ImportEngine } from './import/ImportEngine';
+export { ExportEngine } from './export/ExportEngine';

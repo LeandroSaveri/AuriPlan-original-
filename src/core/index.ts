@@ -2,11 +2,11 @@
 // Core Module Exports
 // ============================================
 
-// Math & Geometry
+// Math
 export * from './math/vector';
 export * from './math/geometry';
 
-// Snap System
+// Snap
 export { SnapSystem } from './snap/SnapSystem';
 export { SnapRenderer } from './snap/SnapRenderer';
 export type { SnapIndicator } from './snap/SnapRenderer';
@@ -14,7 +14,7 @@ export type { SnapIndicator } from './snap/SnapRenderer';
 // Grid
 export { GridRenderer } from './grid/GridRenderer';
 
-// Camera/Viewport
+// Camera
 export { CameraRenderer } from './camera/CameraRenderer';
 
 // Interaction
@@ -33,9 +33,5 @@ export { RoomRenderer } from './room/RoomRenderer';
 // History
 export { HistoryManager } from './history/HistoryManager';
 
-// Project
-export { ProjectManager } from './project/ProjectManager';
-
-// Import/Export
+// Import
 export { ImportEngine } from './import/ImportEngine';
-export { ExportEngine } from './export/ExportEngine';

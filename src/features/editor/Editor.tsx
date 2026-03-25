@@ -9,7 +9,7 @@ import { Toolbar } from './components/Toolbar';
 import { Sidebar } from './components/Sidebar';
 import { Canvas2D } from './components/Canvas2D';
 import { StatusBar } from './components/StatusBar';
-import { WallData, RoomData } from '../../types/editor';
+import { WallData, RoomData } from '../../types';
 
 // ============================================
 // TIPOS
@@ -28,9 +28,6 @@ interface EditorProps {
 // ============================================
 
 export const Editor: React.FC<EditorProps> = ({ projectId, initialData }) => {
-  // --------------------------------------------
-  // Hooks do Editor
-  // --------------------------------------------
   const {
     walls,
     rooms,
@@ -74,22 +71,13 @@ export const Editor: React.FC<EditorProps> = ({ projectId, initialData }) => {
 
   const { isSelectTool, isWallTool, isRoomTool, isMoveTool } = useEditorTools();
 
-  // --------------------------------------------
-  // Inicialização
-  // --------------------------------------------
-
   useEffect(() => {
     if (initialData) {
       loadProject(initialData);
     }
   }, [initialData, loadProject]);
 
-  // --------------------------------------------
-  // Handlers de Teclado
-  // --------------------------------------------
-
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Undo/Redo
     if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
       e.preventDefault();
       if (e.shiftKey) {
@@ -100,7 +88,6 @@ export const Editor: React.FC<EditorProps> = ({ projectId, initialData }) => {
       return;
     }
 
-    // Ferramentas
     switch (e.key.toLowerCase()) {
       case 'v':
         setTool('select');
@@ -138,10 +125,6 @@ export const Editor: React.FC<EditorProps> = ({ projectId, initialData }) => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [handleKeyDown]);
 
-  // --------------------------------------------
-  // Handlers do Canvas
-  // --------------------------------------------
-
   const handleCanvasClick = useCallback((e: React.MouseEvent, worldPoint: { x: number; y: number }) => {
     if (isWallTool) {
       console.log('Desenhar parede em:', worldPoint);
@@ -175,13 +158,8 @@ export const Editor: React.FC<EditorProps> = ({ projectId, initialData }) => {
     updateRoom(id, updates);
   }, [updateRoom]);
 
-  // --------------------------------------------
-  // Render
-  // --------------------------------------------
-
   return (
     <div className="editor-container" style={styles.container}>
-      {/* Toolbar Superior */}
       <Toolbar
         currentTool={tool}
         onToolChange={setTool}
@@ -192,9 +170,7 @@ export const Editor: React.FC<EditorProps> = ({ projectId, initialData }) => {
         onClear={clearProject}
       />
 
-      {/* Área Principal */}
       <div style={styles.mainArea}>
-        {/* Sidebar Esquerda */}
         <Sidebar
           currentTool={tool}
           onToolChange={setTool}
@@ -206,7 +182,6 @@ export const Editor: React.FC<EditorProps> = ({ projectId, initialData }) => {
           onToggleGrid={toggleGrid}
         />
 
-        {/* Canvas Central */}
         <div style={styles.canvasWrapper}>
           <Canvas2D
             walls={walls}
@@ -229,7 +204,6 @@ export const Editor: React.FC<EditorProps> = ({ projectId, initialData }) => {
             onPan={pan}
           />
 
-          {/* Controles de Zoom (flutuante) - TEMPORARIAMENTE REMOVIDO */}
           <div style={styles.zoomControls}>
             <button onClick={zoomOut} style={styles.zoomButton}>-</button>
             <span style={styles.zoomText}>{Math.round(scale * 100)}%</span>
@@ -239,7 +213,6 @@ export const Editor: React.FC<EditorProps> = ({ projectId, initialData }) => {
         </div>
       </div>
 
-      {/* Status Bar Inferior */}
       <StatusBar
         wallCount={walls.length}
         roomCount={rooms.length}
@@ -251,10 +224,6 @@ export const Editor: React.FC<EditorProps> = ({ projectId, initialData }) => {
     </div>
   );
 };
-
-// ============================================
-// ESTILOS
-// ============================================
 
 const styles: Record<string, React.CSSProperties> = {
   container: {
@@ -312,9 +281,5 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#d1d5db',
   },
 };
-
-// ============================================
-// EXPORTAÇÕES
-// ============================================
 
 export default Editor;

@@ -4,8 +4,8 @@
 // ============================================
 
 import { useCallback } from 'react';
-import { useEditorStore } from '../../store/index';
-import type { EditorState } from '../../store/index';
+import { useEditorStore } from '../../store/editorStore';
+import type { EditorState } from '../../store/editorStore';
 import type { Wall, Room } from '../../types';
 
 // ============================================

@@ -22,9 +22,6 @@ export const interaction = new InteractionEngine();
 import { SnapSystem } from './snap/SnapSystem';
 export const snap = new SnapSystem();
 
-// Snap Engine (classe e singleton)
-export { SnapEngine, getSnapEngine, createSnapEngine } from './snap/SnapEngine';
-
 // Renderers (classes)
 export { WallRenderer } from './wall/WallRenderer';
 export { RoomRenderer } from './room/RoomRenderer';
@@ -37,20 +34,18 @@ export { CollisionRenderer } from './collision/CollisionRenderer';
 // Renderer instances (para uso direto no Canvas2D)
 import { WallRenderer } from './wall/WallRenderer';
 import { RoomRenderer } from './room/RoomRenderer';
-
 export const wallRenderer = new WallRenderer();
 export const roomRenderer = new RoomRenderer();
 
-// History
-export { HistoryManager } from './history/HistoryManager';
-export { HistoryEngine } from './history/HistoryEngine';
+// History & Project (via sub-módulo organizado)
+export * from './project';
 
-// Project
-export { ProjectManager } from './project/ProjectManager';
-
-// Import/Export
+// Import/Export Engines
 export { ImportEngine } from './import/ImportEngine';
 export { ExportEngine } from './export/ExportEngine';
+
+// Collision
+export { CollisionEngine } from './collision/CollisionEngine';
 
 // Types
 export type { SnapResult, SnapType, SnapConfig } from './snap/SnapSystem';

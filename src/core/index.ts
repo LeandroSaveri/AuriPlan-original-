@@ -50,4 +50,4 @@ export { CollisionEngine } from './collision/CollisionEngine';
 // Types
 export type { SnapResult, SnapType, SnapConfig } from './snap/SnapSystem';
 export type { Handle } from './interaction/InteractionRenderer';
-export type { SnapIndicator } from './snap/SnapRenderer';
+// REMOVIDO: export type { SnapIndicator } from './snap/SnapRenderer';  // ❌ estava com erro

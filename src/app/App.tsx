@@ -1,8 +1,8 @@
 // ============================================
-// APP - Versão Defensiva
+// APP - Só Home (Editor removido temporariamente)
 // ============================================
 
-import { useState, useEffect, Suspense, lazy } from 'react';
+import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Home, 
@@ -11,15 +11,8 @@ import {
   Settings, 
   User, 
   Box,
-  ChevronRight,
-  Layout,
-  Sparkles
+  Layout
 } from 'lucide-react';
-
-// Lazy load do Editor para não crashar a Home
-const Editor = lazy(() => import('../features/editor/Editor').catch(() => ({
-  default: () => <div style={{ color: 'white', padding: 50 }}>Erro ao carregar Editor</div>
-})));
 
 // ============================================
 // HOME PAGE
@@ -149,46 +142,31 @@ function HomePage({ onCreateProject, onOpenProject }: {
 }
 
 // ============================================
-// MAIN APP
+// MAIN APP - SÓ HOME (sem Editor)
 // ============================================
 export default function App() {
-  const [view, setView] = useState<'home' | 'editor'>('home');
-
   const handleCreateProject = () => {
-    setView('editor');
+    console.log('Novo projeto - Editor em desenvolvimento');
+    alert('Editor em desenvolvimento! Volte em breve.');
   };
 
   const handleOpenProject = () => {
-    setView('editor');
+    console.log('Abrir projeto - Editor em desenvolvimento');
+    alert('Editor em desenvolvimento! Volte em breve.');
   };
 
   return (
     <AnimatePresence mode="wait">
-      {view === 'home' ? (
-        <motion.div
-          key="home"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-        >
-          <HomePage 
-            onCreateProject={handleCreateProject}
-            onOpenProject={handleOpenProject}
-          />
-        </motion.div>
-      ) : (
-        <motion.div
-          key="editor"
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          className="h-screen"
-        >
-          <Suspense fallback={<div style={{ color: 'white', padding: 50 }}>Carregando Editor...</div>}>
-            <Editor onBack={() => setView('home')} />
-          </Suspense>
-        </motion.div>
-      )}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+      >
+        <HomePage 
+          onCreateProject={handleCreateProject}
+          onOpenProject={handleOpenProject}
+        />
+      </motion.div>
     </AnimatePresence>
   );
 }

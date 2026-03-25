@@ -80,8 +80,8 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({ className = '' }) => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
 
-    // Setup canvas size com DPR para retina
-    const dpr = window.devicePixelRatio || 1;
+    // Setup canvas size com DPR para retina (limitado a 2x para evitar problemas no iPhone)
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
     const rect = container.getBoundingClientRect();
     canvas.width = rect.width * dpr;
     canvas.height = rect.height * dpr;
@@ -106,11 +106,12 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({ className = '' }) => {
       opacity: gridConfig.opacity
     });
 
+    // CORREÇÃO: Usar propriedades corretas do snapConfig
     snapRef.current.setConfig({
       enabled: snapConfig.enabled,
-      gridSize: snapConfig.gridSize,
-      snapDistance: snapConfig.snapDistance,
-      angleSnap: snapConfig.angleSnap
+      snapDistance: snapConfig.distance,
+      angleSnap: snapConfig.angle,
+      gridSize: gridConfig.size
     });
 
     // Atualizar dados do snap engine
@@ -144,13 +145,14 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({ className = '' }) => {
   }, [gridConfig]);
 
   useEffect(() => {
+    // CORREÇÃO: Usar propriedades corretas do snapConfig
     snapRef.current.setConfig({
       enabled: snapConfig.enabled,
-      gridSize: snapConfig.gridSize,
-      snapDistance: snapConfig.snapDistance,
-      angleSnap: snapConfig.angleSnap
+      snapDistance: snapConfig.distance,
+      angleSnap: snapConfig.angle,
+      gridSize: gridConfig.size
     });
-  }, [snapConfig]);
+  }, [snapConfig, gridConfig.size]);
 
   useEffect(() => {
     if (currentScene) {
@@ -458,7 +460,8 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({ className = '' }) => {
     if (!canvas || !ctx || !isReady) return;
 
     const rect = canvas.getBoundingClientRect();
-    const dpr = window.devicePixelRatio || 1;
+    // CORREÇÃO: Limitar DPR a 2x para evitar problemas no iPhone
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
 
     // Clear
     ctx.clearRect(0, 0, rect.width * dpr, rect.height * dpr);
@@ -760,7 +763,8 @@ export const Canvas2D: React.FC<Canvas2DProps> = ({ className = '' }) => {
 
       const canvas = canvasRef.current;
       const container = containerRef.current;
-      const dpr = window.devicePixelRatio || 1;
+      // CORREÇÃO: Limitar DPR a 2x para evitar problemas no iPhone
+      const dpr = Math.min(window.devicePixelRatio || 1, 2);
       const rect = container.getBoundingClientRect();
 
       canvas.width = rect.width * dpr;

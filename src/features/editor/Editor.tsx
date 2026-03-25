@@ -183,26 +183,7 @@ export const Editor: React.FC<EditorProps> = ({ projectId, initialData }) => {
         />
 
         <div style={styles.canvasWrapper}>
-          <Canvas2D
-            walls={walls}
-            rooms={rooms}
-            selectedId={selectedId}
-            scale={scale}
-            offset={offset}
-            tool={tool}
-            snapEnabled={snapEnabled}
-            gridSize={gridSize}
-            showGrid={showGrid}
-            isDragging={isDragging}
-            isDrawing={isDrawing}
-            onClick={handleCanvasClick}
-            onMouseDown={handleCanvasMouseDown}
-            onMouseUp={handleCanvasMouseUp}
-            onObjectSelect={handleObjectSelect}
-            onWallUpdate={handleWallUpdate}
-            onRoomUpdate={handleRoomUpdate}
-            onPan={pan}
-          />
+          <Canvas2D />
 
           <div style={styles.zoomControls}>
             <button onClick={zoomOut} style={styles.zoomButton}>-</button>

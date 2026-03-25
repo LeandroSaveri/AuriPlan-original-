@@ -1,67 +1,44 @@
-// Canvas2D.tsx - Orquestrador Production-Grade Final
-import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { useEditorStore } from '../../../store/editorStore';
-import { CameraEngine } from '../../../core/camera/CameraEngine';
-import { SnapEngine } from '../../../core/snap/SnapEngine';
-import { GridEngine } from '../../../core/grid/GridEngine';
-import { InteractionEngine } from '../../../core/interaction/InteractionEngine';
-import { WallRenderer } from '../../../core/wall/WallRenderer';
-import { RoomRenderer } from '../../../core/room/RoomRenderer';
-import type { Vec2 } from '../../../types';
+const toolRef = useRef(useEditorStore.getState().tool);
+const isDrawingRef = useRef(false);
+const drawStartRef = useRef<Vec2 | null>(null);
+const hoveredIdRef = useRef<string | null>(null);
 
-interface Canvas2DProps { className?: string; }
+// função segura para pegar a cena atual
+const getCurrentScene = (state: any) =>
+  state.scenes?.find((s: any) => s.id === state.currentSceneId) ?? null;
 
-export const Canvas2D: React.FC<Canvas2DProps> = ({ className = '' }) => {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const rafRef = useRef<number>(0);
-  const isReadyRef = useRef(false);
+const sceneRef = useRef(getCurrentScene(useEditorStore.getState()));
+const selectedIdsRef = useRef(useEditorStore.getState().selectedIds ?? []);
 
-  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
-  const lastFrameRef = useRef(0);
-  const targetFrame = 16.6;
+const [hoveredId, setHoveredId] = useState<string | null>(null);
+const [isDrawing, setIsDrawing] = useState(false);
+const [drawStart, setDrawStart] = useState<Vec2 | null>(null);
+const [tool, setTool] = useState(useEditorStore.getState().tool);
 
-  const gridCacheRef = useRef<HTMLCanvasElement | null>(null);
-  const gridCacheCameraRef = useRef<string | null>(null);
+// pegar config do store
+const { grid: gridCfg, snap: snapCfg, addWall, select } = useEditorStore();
 
-  const canvasRectRef = useRef<{width:number,height:number}>({width:0,height:0});
+useEffect(() => { toolRef.current = tool; }, [tool]);
+useEffect(() => { isDrawingRef.current = isDrawing; }, [isDrawing]);
+useEffect(() => { drawStartRef.current = drawStart; }, [drawStart]);
+useEffect(() => { hoveredIdRef.current = hoveredId; }, [hoveredId]);
 
-  const camera = useRef(new CameraEngine({ minZoom: 0.1, maxZoom: 10 })).current;
-  const snap = useRef(new SnapEngine()).current;
-  const grid = useRef(new GridEngine()).current;
-  const interaction = useRef(new InteractionEngine()).current;
-  const wallRenderer = useRef(new WallRenderer()).current;
-  const roomRenderer = useRef(new RoomRenderer()).current;
+useEffect(() => {
+  const unsub = useEditorStore.subscribe((state: any) => {
 
-  const toolRef = useRef(useEditorStore.getState().tool);
-  const isDrawingRef = useRef(false);
-  const drawStartRef = useRef<Vec2 | null>(null);
-  const hoveredIdRef = useRef<string | null>(null);
+    sceneRef.current =
+      state.scenes?.find((s: any) => s.id === state.currentSceneId) ?? null;
 
-  const getCurrentScene = (state: any) => state.scenes.find((s: any) => s.id === state.currentSceneId);
-  const sceneRef = useRef(getCurrentScene(useEditorStore.getState()));
-  const selectedIdsRef = useRef(useEditorStore.getState().selectedIds);
+    selectedIdsRef.current = state.selectedIds ?? [];
 
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
-  const [drawStart, setDrawStart] = useState<Vec2 | null>(null);
-  const [tool, setTool] = useState(useEditorStore.getState().tool);
+    if (state.tool !== toolRef.current) {
+      setTool(state.tool);
+    }
 
-  const { grid: gridCfg, snap: snapCfg, addWall, select } = useEditorStore();
+  });
 
-  useEffect(() => { toolRef.current = tool; }, [tool]);
-  useEffect(() => { isDrawingRef.current = isDrawing; }, [isDrawing]);
-  useEffect(() => { drawStartRef.current = drawStart; }, [drawStart]);
-  useEffect(() => { hoveredIdRef.current = hoveredId; }, [hoveredId]);
-
-  useEffect(() => {
-    const unsub = useEditorStore.subscribe((state) => {
-      sceneRef.current = state.scenes.find((s: any) => s.id === state.currentSceneId);
-      selectedIdsRef.current = state.selectedIds;
-      if (state.tool !== toolRef.current) setTool(state.tool);
-    });
-    return unsub;
-  }, []);
+  return unsub;
+}, []);
 
   // screenToWorld otimizado
   const screenToWorld = useCallback((p: any): Vec2 => {

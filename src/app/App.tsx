@@ -1,8 +1,8 @@
 // ============================================
-// APP - Aplicação Principal
+// APP - Versão Defensiva
 // ============================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense, lazy } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Home, 
@@ -15,17 +15,20 @@ import {
   Layout,
   Sparkles
 } from 'lucide-react';
-import { Editor } from '../features/editor/Editor';
-import { useEditorStore } from '../store/editorStore';
+
+// Lazy load do Editor para não crashar a Home
+const Editor = lazy(() => import('../features/editor/Editor').catch(() => ({
+  default: () => <div style={{ color: 'white', padding: 50 }}>Erro ao carregar Editor</div>
+})));
 
 // ============================================
-// HOME PAGE - Página Inicial
+// HOME PAGE
 // ============================================
 function HomePage({ onCreateProject, onOpenProject }: { 
   onCreateProject: () => void; 
   onOpenProject: () => void;
 }) {
-  const [recentProjects, setRecentProjects] = useState<Array<{ id: string; name: string; updatedAt: string }>>([]);
+  const [recentProjects, setRecentProjects] = useState<Array<{ id: string; name: string; updatedAt: string }>>([]));
 
   useEffect(() => {
     const saved = localStorage.getItem('recentProjects');
@@ -85,8 +88,7 @@ function HomePage({ onCreateProject, onOpenProject }: {
               </span>
             </h1>
             <p className="text-xl text-slate-400 mb-8 max-w-2xl mx-auto">
-              Ferramenta profissional de design de interiores com visualização 2D/3D, 
-              biblioteca de móveis e colaboração em tempo real.
+              Ferramenta profissional de design de interiores com visualização 2D/3D.
             </p>
             
             <div className="flex flex-wrap justify-center gap-4">
@@ -94,7 +96,7 @@ function HomePage({ onCreateProject, onOpenProject }: {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={onCreateProject}
-                className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl hover:shadow-lg hover:shadow-blue-500/25 transition-all"
+                className="flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-500 to-purple-600 text-white font-semibold rounded-xl"
               >
                 <Plus className="w-5 h-5" />
                 Novo Projeto
@@ -103,7 +105,7 @@ function HomePage({ onCreateProject, onOpenProject }: {
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
                 onClick={onOpenProject}
-                className="flex items-center gap-2 px-8 py-4 bg-slate-800 text-white font-semibold rounded-xl hover:bg-slate-700 transition-all"
+                className="flex items-center gap-2 px-8 py-4 bg-slate-800 text-white font-semibold rounded-xl"
               >
                 <FolderOpen className="w-5 h-5" />
                 Abrir Projeto
@@ -128,12 +130,11 @@ function HomePage({ onCreateProject, onOpenProject }: {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: index * 0.1 }}
                   whileHover={{ scale: 1.02, y: -4 }}
-                  whileTap={{ scale: 0.98 }}
                   onClick={onCreateProject}
-                  className="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-left hover:border-blue-500/50 hover:bg-slate-800/50 transition-all group"
+                  className="p-6 bg-slate-900 border border-slate-800 rounded-2xl text-left hover:border-blue-500/50"
                 >
-                  <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center mb-4 group-hover:bg-blue-500/20 transition-colors">
-                    <Icon className="w-6 h-6 text-slate-400 group-hover:text-blue-400" />
+                  <div className="w-12 h-12 bg-slate-800 rounded-xl flex items-center justify-center mb-4">
+                    <Icon className="w-6 h-6 text-slate-400" />
                   </div>
                   <h3 className="text-lg font-semibold text-white mb-1">{template.name}</h3>
                   <p className="text-sm text-slate-500">{template.description}</p>
@@ -143,92 +144,6 @@ function HomePage({ onCreateProject, onOpenProject }: {
           </div>
         </div>
       </section>
-
-      {/* Recent Projects */}
-      {recentProjects.length > 0 && (
-        <section className="py-16 px-6 border-t border-slate-800">
-          <div className="max-w-6xl mx-auto">
-            <h2 className="text-2xl font-bold text-white mb-8">Projetos Recentes</h2>
-            
-            <div className="space-y-2">
-              {recentProjects.map((project, index) => (
-                <motion.button
-                  key={project.id}
-                  initial={{ opacity: 0, x: -20 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                  onClick={onOpenProject}
-                  className="w-full flex items-center justify-between p-4 bg-slate-900 border border-slate-800 rounded-xl hover:border-blue-500/50 hover:bg-slate-800/50 transition-all"
-                >
-                  <div className="flex items-center gap-4">
-                    <div className="w-10 h-10 bg-blue-500/20 rounded-lg flex items-center justify-center">
-                      <FolderOpen className="w-5 h-5 text-blue-400" />
-                    </div>
-                    <div className="text-left">
-                      <h3 className="font-medium text-white">{project.name}</h3>
-                      <p className="text-sm text-slate-500">
-                        Editado {new Date(project.updatedAt).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                  </div>
-                  <ChevronRight className="w-5 h-5 text-slate-500" />
-                </motion.button>
-              ))}
-            </div>
-          </div>
-        </section>
-      )}
-
-      {/* Features Section */}
-      <section className="py-16 px-6 border-t border-slate-800">
-        <div className="max-w-6xl mx-auto">
-          <h2 className="text-2xl font-bold text-white mb-8 text-center">Recursos Premium</h2>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: Layout,
-                title: 'Editor 2D/3D',
-                description: 'Crie plantas baixas em 2D e visualize em 3D com renderização em tempo real.',
-              },
-              {
-                icon: Box,
-                title: 'Biblioteca de Móveis',
-                description: 'Milhares de itens de móveis em alta qualidade para decorar seus espaços.',
-              },
-              {
-                icon: Sparkles,
-                title: 'Design com IA',
-                description: 'Deixe a inteligência artificial sugerir designs para seus cômodos.',
-              },
-            ].map((feature, index) => {
-              const Icon = feature.icon;
-              return (
-                <motion.div
-                  key={feature.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.3 + index * 0.1 }}
-                  className="text-center p-6"
-                >
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500/20 to-purple-500/20 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                    <Icon className="w-8 h-8 text-blue-400" />
-                  </div>
-                  <h3 className="text-lg font-semibold text-white mb-2">{feature.title}</h3>
-                  <p className="text-slate-400">{feature.description}</p>
-                </motion.div>
-              );
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="py-8 px-6 border-t border-slate-800">
-        <div className="max-w-6xl mx-auto text-center text-slate-500 text-sm">
-          <p>© 2024 AuriPlan. Todos os direitos reservados.</p>
-        </div>
-      </footer>
     </div>
   );
 }
@@ -238,19 +153,13 @@ function HomePage({ onCreateProject, onOpenProject }: {
 // ============================================
 export default function App() {
   const [view, setView] = useState<'home' | 'editor'>('home');
-  const { createProject } = useEditorStore();
 
   const handleCreateProject = () => {
-    createProject(
-      'Novo Projeto',
-      { id: 'user-1', name: 'Usuário', email: 'user@example.com', role: 'owner' },
-      ''
-    );
     setView('editor');
   };
 
   const handleOpenProject = () => {
-    handleCreateProject();
+    setView('editor');
   };
 
   return (
@@ -275,7 +184,9 @@ export default function App() {
           exit={{ opacity: 0 }}
           className="h-screen"
         >
-          <Editor onBack={() => setView('home')} />
+          <Suspense fallback={<div style={{ color: 'white', padding: 50 }}>Carregando Editor...</div>}>
+            <Editor onBack={() => setView('home')} />
+          </Suspense>
         </motion.div>
       )}
     </AnimatePresence>

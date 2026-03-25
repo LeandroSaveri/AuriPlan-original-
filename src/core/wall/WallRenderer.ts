@@ -1,237 +1,251 @@
-// WallRenderer.ts - Renderer de Paredes
-// Responsabilidade: Desenhar paredes no canvas 2D
+// ============================================
+// WallRenderer.ts
+// Renderizador especializado em paredes
+// Responsabilidade: Desenhar paredes com espessura, cantos arredondados, e materiais
+// ============================================
 
-import type { Vec2 } from '../../types';
+import { Wall, Vec2 } from '../../types';
 
-export interface Wall {
-  id: string;
-  start: Vec2;
-  end: Vec2;
-  thickness?: number;
-  height?: number;
-  color?: string;
-}
-
-export interface Door {
-  id: string;
-  wallId: string;
-  position: number; // Posição ao longo da parede (0-1)
-  width: number;
-  height?: number;
-  color?: string;
-}
-
-export interface Window {
-  id: string;
-  wallId: string;
-  position: number; // Posição ao longo da parede (0-1)
-  width: number;
-  height?: number;
-  sillHeight?: number;
-  color?: string;
+interface WallRenderOptions {
+  showMeasurements?: boolean;
+  showDirection?: boolean;
+  highlightSelected?: boolean;
+  opacity?: number;
 }
 
 export class WallRenderer {
-  private defaultThickness = 0.2;
-  private defaultColor = '#475569';
-  private selectedColor = '#3b82f6';
-  private hoveredColor = '#60a5fa';
+  private options: WallRenderOptions = {
+    showMeasurements: true,
+    showDirection: false,
+    highlightSelected: true,
+    opacity: 1
+  };
+
+  setOptions(options: Partial<WallRenderOptions>): void {
+    this.options = { ...this.options, ...options };
+  }
 
   render(
     ctx: CanvasRenderingContext2D,
     walls: Wall[],
     selectedIds: string[],
-    hoveredId: string | null
+    hoveredId?: string | null
   ): void {
-    if (!walls || walls.length === 0) return;
+    // Renderizar paredes de trás para frente (ordem z-index)
+    const sortedWalls = [...walls].sort((a, b) => (a.zIndex || 0) - (b.zIndex || 0));
 
-    walls.forEach(wall => {
+    sortedWalls.forEach(wall => {
       const isSelected = selectedIds.includes(wall.id);
       const isHovered = wall.id === hoveredId;
-      this.renderWall(ctx, wall, isSelected, isHovered);
+
+      this.renderWallFill(ctx, wall, isSelected);
+      this.renderWallStroke(ctx, wall, isSelected, isHovered);
     });
+
+    // Renderizar medidas
+    if (this.options.showMeasurements) {
+      sortedWalls.forEach(wall => {
+        this.renderWallMeasurements(ctx, wall);
+      });
+    }
   }
 
-  private renderWall(
+  private renderWallFill(
+    ctx: CanvasRenderingContext2D,
+    wall: Wall,
+    isSelected: boolean
+  ): void {
+    const start = wall.start;
+    const end = wall.end;
+    const thickness = wall.thickness || 10;
+
+    ctx.save();
+    ctx.globalAlpha = this.options.opacity;
+
+    // Cor base ou cor de seleção
+    if (isSelected && this.options.highlightSelected) {
+      ctx.fillStyle = '#3b82f6'; // blue-500
+      ctx.shadowColor = '#3b82f6';
+      ctx.shadowBlur = 10;
+    } else {
+      ctx.fillStyle = wall.color || '#374151'; // gray-700 padrão
+    }
+
+    // Desenhar retângulo da parede com rotação
+    this.drawWallRectangle(ctx, start, end, thickness);
+
+    ctx.restore();
+  }
+
+  private renderWallStroke(
     ctx: CanvasRenderingContext2D,
     wall: Wall,
     isSelected: boolean,
     isHovered: boolean
   ): void {
-    const thickness = wall.thickness || this.defaultThickness;
-    const halfThickness = thickness / 2;
-
-    // Calcula vetor perpendicular
-    const dx = wall.end[0] - wall.start[0];
-    const dy = wall.end[1] - wall.start[1];
-    const length = Math.sqrt(dx * dx + dy * dy);
-
-    if (length === 0) return;
-
-    const perpX = (-dy / length) * halfThickness;
-    const perpY = (dx / length) * halfThickness;
-
-    // Define cor
-    let color = wall.color || this.defaultColor;
-    if (isSelected) color = this.selectedColor;
-    else if (isHovered) color = this.hoveredColor;
+    const start = wall.start;
+    const end = wall.end;
+    const thickness = wall.thickness || 10;
 
     ctx.save();
-    ctx.fillStyle = color;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 0.01;
+    ctx.globalAlpha = this.options.opacity;
 
-    // Desenha a parede como um retângulo
+    // Linhas de contorno
+    ctx.strokeStyle = isSelected
+      ? '#3b82f6'
+      : isHovered
+      ? '#60a5fa'
+      : '#1f2937';
+
+    ctx.lineWidth = 0.5;
+
+    this.drawWallRectangleStroke(ctx, start, end, thickness);
+    
+    // Linha central (eixo da parede)
+    ctx.strokeStyle = isSelected ? '#93c5fd' : '#6b7280'; // blue-300 ou gray-500
+    ctx.lineWidth = 0.25;
+    ctx.setLineDash([5, 5]);
+    
     ctx.beginPath();
-    ctx.moveTo(wall.start[0] + perpX, wall.start[1] + perpY);
-    ctx.lineTo(wall.end[0] + perpX, wall.end[1] + perpY);
-    ctx.lineTo(wall.end[0] - perpX, wall.end[1] - perpY);
-    ctx.lineTo(wall.start[0] - perpX, wall.start[1] - perpY);
+    ctx.moveTo(start[0], start[1]);
+    ctx.lineTo(end[0], end[1]);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  private renderWallMeasurements(ctx: CanvasRenderingContext2D, wall: Wall): void {
+    const start = wall.start;
+    const end = wall.end;
+    
+    // Calcular comprimento em unidades do mundo
+    const length = Math.sqrt(
+      Math.pow(end[0] - start[0], 2) + 
+      Math.pow(end[1] - start[1], 2)
+    );
+    
+    const midX = (start[0] + end[0]) / 2;
+    const midY = (start[1] + end[1]) / 2;
+
+    ctx.save();
+    
+    // Fundo da label
+    const text = `${length.toFixed(2)}m`;
+    ctx.font = '12px Inter, system-ui, sans-serif';
+    const metrics = ctx.measureText(text);
+    const padding = 4;
+    
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+    ctx.fillRect(
+      midX - metrics.width / 2 - padding,
+      midY - 10 - padding,
+      metrics.width + padding * 2,
+      20 + padding * 2
+    );
+
+    // Texto
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(text, midX, midY);
+
+    ctx.restore();
+  }
+
+  private drawWallRectangle(
+    ctx: CanvasRenderingContext2D,
+    start: Vec2,
+    end: Vec2,
+    thickness: number
+  ): void {
+    const angle = Math.atan2(end[1] - start[1], end[0] - start[0]);
+    const halfThickness = thickness / 2;
+    
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    
+    // Cantos do retângulo
+    const p1: Vec2 = [
+      start[0] - halfThickness * sin,
+      start[1] + halfThickness * cos
+    ];
+    const p2: Vec2 = [
+      start[0] + halfThickness * sin,
+      start[1] - halfThickness * cos
+    ];
+    const p3: Vec2 = [
+      end[0] + halfThickness * sin,
+      end[1] - halfThickness * cos
+    ];
+    const p4: Vec2 = [
+      end[0] - halfThickness * sin,
+      end[1] + halfThickness * cos
+    ];
+
+    ctx.beginPath();
+    ctx.moveTo(p1[0], p1[1]);
+    ctx.lineTo(p2[0], p2[1]);
+    ctx.lineTo(p3[0], p3[1]);
+    ctx.lineTo(p4[0], p4[1]);
     ctx.closePath();
     ctx.fill();
-    ctx.stroke();
-
-    // Se selecionada, desenha contorno destacado
-    if (isSelected) {
-      ctx.strokeStyle = this.selectedColor;
-      ctx.lineWidth = 0.03;
-      ctx.setLineDash([0.05, 0.05]);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-
-    ctx.restore();
   }
 
-  // Renderiza uma porta
-  renderDoor(ctx: CanvasRenderingContext2D, door: Door, wall: Wall): void {
-    const wallDir = [wall.end[0] - wall.start[0], wall.end[1] - wall.start[1]];
-    const wallLen = Math.sqrt(wallDir[0] * wallDir[0] + wallDir[1] * wallDir[1]);
-    const wallUnit = [wallDir[0] / wallLen, wallDir[1] / wallLen];
-
-    const doorStart: Vec2 = [
-      wall.start[0] + wallUnit[0] * door.position,
-      wall.start[1] + wallUnit[1] * door.position
+  private drawWallRectangleStroke(
+    ctx: CanvasRenderingContext2D,
+    start: Vec2,
+    end: Vec2,
+    thickness: number
+  ): void {
+    const angle = Math.atan2(end[1] - start[1], end[0] - start[0]);
+    const halfThickness = thickness / 2;
+    
+    const cos = Math.cos(angle);
+    const sin = Math.sin(angle);
+    
+    const p1: Vec2 = [
+      start[0] - halfThickness * sin,
+      start[1] + halfThickness * cos
     ];
-    const doorEnd: Vec2 = [
-      doorStart[0] + wallUnit[0] * door.width,
-      doorStart[1] + wallUnit[1] * door.width
+    const p2: Vec2 = [
+      start[0] + halfThickness * sin,
+      start[1] - halfThickness * cos
+    ];
+    const p3: Vec2 = [
+      end[0] + halfThickness * sin,
+      end[1] - halfThickness * cos
+    ];
+    const p4: Vec2 = [
+      end[0] - halfThickness * sin,
+      end[1] + halfThickness * cos
     ];
 
+    ctx.beginPath();
+    ctx.moveTo(p1[0], p1[1]);
+    ctx.lineTo(p2[0], p2[1]);
+    ctx.lineTo(p3[0], p3[1]);
+    ctx.lineTo(p4[0], p4[1]);
+    ctx.closePath();
+    ctx.stroke();
+  }
+
+  // Método para renderizar preview durante criação
+  renderPreview(
+    ctx: CanvasRenderingContext2D,
+    start: Vec2,
+    end: Vec2,
+    thickness: number = 10
+  ): void {
     ctx.save();
-    ctx.strokeStyle = '#8B4513';
-    ctx.fillStyle = '#D2691E';
-    ctx.lineWidth = 0.05;
-
-    // Linha da porta
-    ctx.beginPath();
-    ctx.moveTo(doorStart[0], doorStart[1]);
-    ctx.lineTo(doorEnd[0], doorEnd[1]);
+    ctx.globalAlpha = 0.5;
+    ctx.fillStyle = '#6b7280';
+    ctx.strokeStyle = '#3b82f6';
+    ctx.lineWidth = 2;
+    
+    this.drawWallRectangle(ctx, start, end, thickness);
+    ctx.fill();
     ctx.stroke();
-
-    // Arco de abertura
-    ctx.beginPath();
-    ctx.arc(
-      doorStart[0], 
-      doorStart[1], 
-      door.width, 
-      Math.atan2(wallUnit[1], wallUnit[0]), 
-      Math.atan2(wallUnit[1], wallUnit[0]) + Math.PI / 2
-    );
-    ctx.stroke();
-
+    
     ctx.restore();
-  }
-
-  // Renderiza uma janela
-  renderWindow(ctx: CanvasRenderingContext2D, window: Window, wall: Wall): void {
-    const wallDir = [wall.end[0] - wall.start[0], wall.end[1] - wall.start[1]];
-    const wallLen = Math.sqrt(wallDir[0] * wallDir[0] + wallDir[1] * wallDir[1]);
-    const wallUnit = [wallDir[0] / wallLen, wallDir[1] / wallLen];
-
-    const winStart: Vec2 = [
-      wall.start[0] + wallUnit[0] * window.position,
-      wall.start[1] + wallUnit[1] * window.position
-    ];
-    const winEnd: Vec2 = [
-      winStart[0] + wallUnit[0] * window.width,
-      winStart[1] + wallUnit[1] * window.width
-    ];
-
-    ctx.save();
-    ctx.strokeStyle = '#87CEEB';
-    ctx.fillStyle = 'rgba(135, 206, 235, 0.3)';
-    ctx.lineWidth = 0.08;
-
-    // Linha da janela
-    ctx.beginPath();
-    ctx.moveTo(winStart[0], winStart[1]);
-    ctx.lineTo(winEnd[0], winEnd[1]);
-    ctx.stroke();
-
-    // Linhas de vidro
-    ctx.lineWidth = 0.02;
-    ctx.setLineDash([0.05, 0.05]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    ctx.restore();
-  }
-
-  // Cria uma nova parede
-  createWall(
-    start: Vec2, 
-    end: Vec2, 
-    options: { thickness?: number; height?: number; color?: string } = {}
-  ): Wall {
-    return {
-      id: `wall_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      start,
-      end,
-      thickness: options.thickness || this.defaultThickness,
-      height: options.height || 2.8,
-      color: options.color || this.defaultColor
-    };
-  }
-
-  // Hit test - verifica se ponto está próximo da parede
-  hitTest(point: Vec2, walls: Wall[], threshold: number = 0.3): string | null {
-    for (const wall of walls) {
-      const dist = this.pointToLineDistance(
-        point[0], point[1],
-        wall.start[0], wall.start[1],
-        wall.end[0], wall.end[1]
-      );
-      if (dist < threshold) {
-        return wall.id;
-      }
-    }
-    return null;
-  }
-
-  private pointToLineDistance(
-    px: number, py: number,
-    x1: number, y1: number,
-    x2: number, y2: number
-  ): number {
-    const A = px - x1;
-    const B = py - y1;
-    const C = x2 - x1;
-    const D = y2 - y1;
-
-    const dot = A * C + B * D;
-    const lenSq = C * C + D * D;
-    let param = -1;
-
-    if (lenSq !== 0) param = dot / lenSq;
-
-    let xx, yy;
-    if (param < 0) { xx = x1; yy = y1; }
-    else if (param > 1) { xx = x2; yy = y2; }
-    else { xx = x1 + param * C; yy = y1 + param * D; }
-
-    return Math.hypot(px - xx, py - yy);
   }
 }
-
-export default WallRenderer;

@@ -30,7 +30,10 @@ export interface PDFExportResult {
   size: number;
 }
 
-class PDFExporter {
+// ============================================
+// CLASSE EXPORTADA - ADICIONADO 'export'
+// ============================================
+export class PDFExporter {
   private defaultOptions: PDFExportOptions = {
     pageSize: 'A4',
     orientation: 'landscape',

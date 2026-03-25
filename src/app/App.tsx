@@ -16,8 +16,8 @@ import {
   Layout,
   Box
 } from 'lucide-react';
-import { Editor } from '@features/editor/Editor';
-import { useEditorStore } from '@store/editorStore';
+import { Editor } from '../features/editor/Editor';
+import { useEditorStore } from '../store/editorStore';
 
 // ============================================
 // HOME PAGE - Página Inicial

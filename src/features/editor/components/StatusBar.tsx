@@ -1,146 +1,214 @@
 // ============================================
-// STATUS BAR - Barra de Status
+// StatusBar.tsx - Barra de Status Premium
+// Desktop: Bottom fixo | Mobile: Compacta ou oculta
 // ============================================
 
+import React from 'react';
 import { 
-  MousePointer2, 
-  Layers, 
-  Box, 
-  Ruler,
-  ZoomIn,
-  Grid3X3,
-  Maximize2,
-  Eye,
-  Users,
-  Wifi,
-  WifiOff,
-  Save
+  Wifi, 
+  WifiOff, 
+  Users, 
+  Save, 
+  Clock,
+  MousePointer2,
+  Maximize2
 } from 'lucide-react';
-import { useEditorStore } from '@store/editorStore';
-import type { ViewMode, Tool } from '@types';
+import { useEditorStore, selectCurrentScene } from '@/store/editorStore';
+import { useEditor } from '@/hooks/useEditor';
 
 interface StatusBarProps {
-  viewMode: ViewMode;
-  tool: Tool;
-  stats: {
-    walls: number;
-    rooms: number;
-    doors: number;
-    windows: number;
-    furniture: number;
-    area: number;
-  };
-  selectedCount: number;
+  className?: string;
 }
 
-const toolLabels: Record<Tool, string> = {
-  select: 'Selecionar',
-  pan: 'Mover Vista',
-  wall: 'Parede',
-  room: 'Cômodo',
-  door: 'Porta',
-  window: 'Janela',
-  furniture: 'Móvel',
-  measure: 'Medir',
-  text: 'Texto',
-  eraser: 'Apagar',
-};
-
-export function StatusBar({ viewMode, tool, stats, selectedCount }: StatusBarProps) {
-  const { grid, camera, project } = useEditorStore();
+export const StatusBar: React.FC<StatusBarProps> = ({ className = '' }) => {
+  const currentScene = useEditorStore(selectCurrentScene);
+  const { camera, grid, isOnline, isSaving, collaborators } = useEditor();
+  
+  // Calcular estatísticas
+  const stats = {
+    walls: currentScene?.walls?.length || 0,
+    rooms: currentScene?.rooms?.length || 0,
+    furniture: currentScene?.furniture?.length || 0,
+    area: currentScene?.rooms?.reduce((acc: number, room: any) => acc + (room.area || 0), 0) || 0
+  };
 
   return (
-    <div className="h-8 bg-slate-900 border-t border-slate-800 flex items-center px-4 text-xs">
-      {/* Left Side */}
-      <div className="flex items-center gap-4">
-        {/* Current Tool */}
-        <div className="flex items-center gap-2 text-slate-400">
-          <MousePointer2 className="w-3.5 h-3.5" />
-          <span>{toolLabels[tool]}</span>
+    <>
+      {/* DESKTOP: Status Bar Completa */}
+      <div className={`
+        hidden lg:flex
+        fixed bottom-0 left-0 right-0
+        h-8 bg-slate-900/95 backdrop-blur-xl
+        border-t border-slate-700/50
+        items-center justify-between px-4
+        text-xs z-40
+        ${className}
+      `}>
+        {/* Left: Grid & Zoom Info */}
+        <div className="flex items-center gap-4">
+          <StatusItem 
+            icon={<Maximize2 size={12} />}
+            label="Grade"
+            value={`${grid.size}m`}
+          />
+          <StatusDivider />
+          <StatusItem 
+            label="Zoom"
+            value={`${(camera.zoom * 100).toFixed(0)}%`}
+          />
+          <StatusDivider />
+          <StatusItem 
+            icon={<MousePointer2 size={12} />}
+            label="Posição"
+            value={`X: ${camera.position[0].toFixed(2)} Y: ${camera.position[2].toFixed(2)}`}
+          />
         </div>
 
-        <div className="w-px h-4 bg-slate-700" />
-
-        {/* View Mode */}
-        <div className="flex items-center gap-2 text-slate-400">
-          <Layers className="w-3.5 h-3.5" />
-          <span>{viewMode.toUpperCase()}</span>
+        {/* Center: Selection Stats */}
+        <div className="flex items-center gap-4">
+          <StatusBadge 
+            label="Área"
+            value={`${stats.area.toFixed(1)}m²`}
+            color="blue"
+          />
+          <StatusBadge 
+            label="Cômodos"
+            value={stats.rooms}
+            color="emerald"
+          />
+          <StatusBadge 
+            label="Paredes"
+            value={stats.walls}
+            color="amber"
+          />
+          <StatusBadge 
+            label="Móveis"
+            value={stats.furniture}
+            color="purple"
+          />
         </div>
 
-        <div className="w-px h-4 bg-slate-700" />
-
-        {/* Grid Status */}
-        <div className={`flex items-center gap-2 ${grid.visible ? 'text-blue-400' : 'text-slate-500'}`}>
-          <Grid3X3 className="w-3.5 h-3.5" />
-          <span>Grade {grid.size}m</span>
-        </div>
-
-        <div className="w-px h-4 bg-slate-700" />
-
-        {/* Zoom Level */}
-        <div className="flex items-center gap-2 text-slate-400">
-          <ZoomIn className="w-3.5 h-3.5" />
-          <span>{(camera.zoom * 100).toFixed(0)}%</span>
-        </div>
-      </div>
-
-      <div className="flex-1" />
-
-      {/* Center */}
-      <div className="flex items-center gap-4">
-        {/* Selection Info */}
-        {selectedCount > 0 && (
-          <div className="flex items-center gap-2 text-blue-400">
-            <Box className="w-3.5 h-3.5" />
-            <span>{selectedCount} objeto(s) selecionado(s)</span>
+        {/* Right: System Status */}
+        <div className="flex items-center gap-3">
+          {/* Save Status */}
+          <div className={`
+            flex items-center gap-1.5 px-2 py-1 rounded-md
+            ${isSaving ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}
+          `}>
+            <Save size={12} className={isSaving ? 'animate-pulse' : ''} />
+            <span className="font-medium">
+              {isSaving ? 'Salvando...' : 'Salvo'}
+            </span>
           </div>
-        )}
 
-        {/* Stats */}
-        <div className="flex items-center gap-3 text-slate-500">
-          <span className="flex items-center gap-1">
-            <Ruler className="w-3 h-3" />
-            {stats.area.toFixed(1)}m²
+          <StatusDivider />
+
+          {/* Connection */}
+          <div className={`
+            flex items-center gap-1.5
+            ${isOnline ? 'text-emerald-400' : 'text-red-400'}
+          `}>
+            {isOnline ? <Wifi size={12} /> : <WifiOff size={12} />}
+            <span>{isOnline ? 'Online' : 'Offline'}</span>
+          </div>
+
+          <StatusDivider />
+
+          {/* Collaborators */}
+          <div className="flex items-center gap-1.5 text-slate-400">
+            <Users size={12} />
+            <span>{collaborators}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* MOBILE: Status Bar Compacta (apenas essencial) */}
+      <div className={`
+        lg:hidden
+        fixed top-0 left-0 right-0
+        h-10 bg-slate-900/98 backdrop-blur-xl
+        border-b border-slate-700/50
+        flex items-center justify-between px-3
+        text-xs z-50
+        ${className}
+      `}>
+        {/* Left: Save Status */}
+        <div className={`
+          flex items-center gap-1.5 px-2 py-1 rounded-md
+          ${isSaving ? 'bg-amber-500/10 text-amber-400' : 'bg-emerald-500/10 text-emerald-400'}
+        `}>
+          <Save size={12} className={isSaving ? 'animate-pulse' : ''} />
+          <span className="font-medium text-[10px]">
+            {isSaving ? '...' : '✓'}
           </span>
-          <span>{stats.rooms} cômodos</span>
-          <span>{stats.walls} paredes</span>
-          <span>{stats.furniture} móveis</span>
+        </div>
+
+        {/* Center: Quick Stats */}
+        <div className="flex items-center gap-3 text-slate-400">
+          <span className="text-[10px]">
+            <span className="text-slate-500">Área:</span> {stats.area.toFixed(0)}m²
+          </span>
+          <span className="text-[10px]">
+            <span className="text-slate-500">Zoom:</span> {(camera.zoom * 100).toFixed(0)}%
+          </span>
+        </div>
+
+        {/* Right: Connection */}
+        <div className={`
+          flex items-center gap-1
+          ${isOnline ? 'text-emerald-400' : 'text-red-400'}
+        `}>
+          {isOnline ? <Wifi size={14} /> : <WifiOff size={14} />}
         </div>
       </div>
+    </>
+  );
+};
 
-      <div className="flex-1" />
+// Componentes Auxiliares
 
-      {/* Right Side */}
-      <div className="flex items-center gap-4">
-        {/* Save Status */}
-        <div className="flex items-center gap-2 text-green-400">
-          <Save className="w-3.5 h-3.5" />
-          <span>Salvo</span>
-        </div>
+interface StatusItemProps {
+  icon?: React.ReactNode;
+  label: string;
+  value: string;
+}
 
-        <div className="w-px h-4 bg-slate-700" />
+const StatusItem: React.FC<StatusItemProps> = ({ icon, label, value }) => (
+  <div className="flex items-center gap-1.5 text-slate-400">
+    {icon && <span className="text-slate-500">{icon}</span>}
+    <span className="text-slate-500">{label}:</span>
+    <span className="text-slate-300 font-mono">{value}</span>
+  </div>
+);
 
-        {/* Connection Status */}
-        <div className="flex items-center gap-2 text-green-400">
-          <Wifi className="w-3.5 h-3.5" />
-          <span>Online</span>
-        </div>
+const StatusDivider = () => (
+  <div className="w-px h-4 bg-slate-700" />
+);
 
-        <div className="w-px h-4 bg-slate-700" />
+interface StatusBadgeProps {
+  label: string;
+  value: string | number;
+  color: 'blue' | 'emerald' | 'amber' | 'purple' | 'red';
+}
 
-        {/* Collaborators */}
-        <div className="flex items-center gap-2 text-slate-400">
-          <Users className="w-3.5 h-3.5" />
-          <span>1 usuário</span>
-        </div>
+const StatusBadge: React.FC<StatusBadgeProps> = ({ label, value, color }) => {
+  const colors = {
+    blue: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    emerald: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
+    amber: 'bg-amber-500/10 text-amber-400 border-amber-500/20',
+    purple: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
+    red: 'bg-red-500/10 text-red-400 border-red-500/20',
+  };
 
-        <div className="w-px h-4 bg-slate-700" />
-
-        {/* Coordinates */}
-        <div className="text-slate-500">
-          <span>X: {camera.position[0].toFixed(2)} Y: {camera.position[1].toFixed(2)}</span>
-        </div>
-      </div>
+  return (
+    <div className={`
+      flex items-center gap-1.5 px-2 py-0.5 rounded-md border
+      ${colors[color]}
+    `}>
+      <span className="text-slate-500">{label}:</span>
+      <span className="font-medium">{value}</span>
     </div>
   );
-}
+};
+
+export default StatusBar;

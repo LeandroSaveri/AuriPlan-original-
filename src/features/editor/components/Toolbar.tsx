@@ -1,334 +1,382 @@
 // ============================================
-// TOOLBAR - Barra de Ferramentas Premium
+// Toolbar.tsx - Barra de Ferramentas Premium
+// Desktop: Vertical esquerda | Mobile: Horizontal inferior
 // ============================================
 
+import React, { useState } from 'react';
 import { 
   MousePointer2, 
-  Move, 
-  Hand,
-  ZoomIn, 
-  Square as Wall,
   Square, 
-  Box,
-  DoorOpen,
-  AppWindow,
+  Circle, 
+  DoorOpen, 
+  Square as WindowIcon,
+  Armchair,
   Ruler,
-  Type,
-  Eraser,
   Grid3X3,
-  Maximize2,
-  Eye,
-  EyeOff,
-  Undo,
-  Redo,
+  ZoomIn,
+  ZoomOut,
+  Undo2,
+  Redo2,
   Save,
-  Download,
-  Settings,
-  Menu,
-  ChevronDown,
-  Layers,
-  Box as Cube,
-  Split,
-  FileImage,
-  Share2,
-  Printer,
-  Camera,
-  Video,
-  RotateCcw,
-  Focus,
-  Minus,
-  Plus
+  MoreVertical,
+  ChevronUp
 } from 'lucide-react';
-import { useEditorStore } from '@store/editorStore';
-import type { ViewMode, Tool } from '@types';
-import { useState } from 'react';
+import { useEditorStore } from '@/store/editorStore';
 import { motion, AnimatePresence } from 'framer-motion';
 
 interface ToolbarProps {
-  viewMode: ViewMode;
-  onViewModeChange: (mode: ViewMode) => void;
-  tool: Tool;
-  onToolChange: (tool: Tool) => void;
   onToggleSidebar: () => void;
   isSidebarOpen: boolean;
+  className?: string;
 }
 
-const tools = [
-  { id: 'select' as Tool, icon: MousePointer2, label: 'Selecionar', shortcut: 'V' },
-  { id: 'pan' as Tool, icon: Hand, label: 'Mover Vista', shortcut: 'H' },
-  { id: 'wall' as Tool, icon: Wall, label: 'Parede', shortcut: 'W' },
-  { id: 'room' as Tool, icon: Square, label: 'Cômodo', shortcut: 'R' },
-  { id: 'door' as Tool, icon: DoorOpen, label: 'Porta', shortcut: 'D' },
-  { id: 'window' as Tool, icon: AppWindow, label: 'Janela', shortcut: 'J' },
-  { id: 'furniture' as Tool, icon: Box, label: 'Móvel', shortcut: 'F' },
-  { id: 'measure' as Tool, icon: Ruler, label: 'Medir', shortcut: 'M' },
-  { id: 'text' as Tool, icon: Type, label: 'Texto', shortcut: 'T' },
-  { id: 'eraser' as Tool, icon: Eraser, label: 'Apagar', shortcut: 'E' },
+type ToolType = 'select' | 'wall' | 'room' | 'door' | 'window' | 'furniture' | 'measure';
+
+interface ToolButton {
+  id: ToolType;
+  icon: React.ReactNode;
+  label: string;
+  shortcut?: string;
+  premium?: boolean;
+}
+
+const tools: ToolButton[] = [
+  { id: 'select', icon: <MousePointer2 size={20} />, label: 'Selecionar', shortcut: 'V' },
+  { id: 'wall', icon: <Square size={20} />, label: 'Parede', shortcut: 'W' },
+  { id: 'room', icon: <Grid3X3 size={20} />, label: 'Cômodo', shortcut: 'R' },
+  { id: 'door', icon: <DoorOpen size={20} />, label: 'Porta', shortcut: 'D' },
+  { id: 'window', icon: <WindowIcon size={20} />, label: 'Janela', shortcut: 'J' },
+  { id: 'furniture', icon: <Armchair size={20} />, label: 'Móvel', shortcut: 'F', premium: true },
+  { id: 'measure', icon: <Ruler size={20} />, label: 'Medir', shortcut: 'M' },
 ];
 
-export function Toolbar({ 
-  viewMode, 
-  onViewModeChange, 
-  tool, 
-  onToolChange,
-  onToggleSidebar,
-  isSidebarOpen 
-}: ToolbarProps) {
-  const { 
-    grid, 
-    toggleGrid, 
-    canUndo, 
-    canRedo, 
-    undo, 
-    redo, 
-    saveProject,
-    project,
-    zoomIn,
-    zoomOut,
-    fitToView,
-    camera,
-    setCamera,
-  } = useEditorStore();
+export const Toolbar: React.FC<ToolbarProps> = ({ 
+  onToggleSidebar, 
+  isSidebarOpen,
+  className = '' 
+}) => {
+  const { tool, setTool, undo, redo, canUndo, canRedo, saveProject } = useEditorStore();
+  const [showMobileMenu, setShowMobileMenu] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(true);
 
-  const [showExportMenu, setShowExportMenu] = useState(false);
-  const [showViewMenu, setShowViewMenu] = useState(false);
-
-  const handleExport = (format: string) => {
-    const data = useEditorStore.getState().exportProject();
-    
-    switch (format) {
-      case 'json':
-        const blob = new Blob([data], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `${project?.name || 'project'}.json`;
-        a.click();
-        break;
-      case 'png':
-        // Export as PNG would require canvas capture
-        break;
-      case 'pdf':
-        // Export as PDF
-        break;
-    }
-    setShowExportMenu(false);
+  const handleToolClick = (toolId: ToolType) => {
+    setTool(toolId);
+    setShowMobileMenu(false);
   };
 
   return (
-    <div className="h-14 bg-slate-900 border-b border-slate-800 flex items-center px-2 gap-1">
-      {/* Menu Toggle */}
-      <button
-        onClick={onToggleSidebar}
-        className={`p-2 rounded-lg transition-colors ${
-          isSidebarOpen ? 'bg-blue-500/20 text-blue-400' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-        }`}
-        title="Toggle Sidebar"
-      >
-        <Menu className="w-5 h-5" />
-      </button>
+    <>
+      {/* DESKTOP: Toolbar Vertical Esquerda */}
+      <div className={`
+        hidden lg:flex flex-col
+        fixed left-4 top-1/2 -translate-y-1/2 z-50
+        bg-slate-900/95 backdrop-blur-xl
+        border border-slate-700/50
+        rounded-2xl shadow-2xl shadow-black/50
+        transition-all duration-300 ease-out
+        ${isExpanded ? 'w-16 py-4' : 'w-12 py-3'}
+        ${className}
+      `}>
+        {/* Toggle Expand */}
+        <button
+          onClick={() => setIsExpanded(!isExpanded)}
+          className="mx-auto mb-3 p-2 rounded-lg hover:bg-slate-800 text-slate-400 transition-colors"
+        >
+          <motion.div
+            animate={{ rotate: isExpanded ? 0 : 180 }}
+            transition={{ duration: 0.2 }}
+          >
+            <ChevronUp size={16} />
+          </motion.div>
+        </button>
 
-      <div className="w-px h-6 bg-slate-700 mx-1" />
+        <div className="flex-1 flex flex-col gap-1 px-2">
+          {tools.map((t) => (
+            <ToolButtonComponent
+              key={t.id}
+              tool={t}
+              isActive={tool === t.id}
+              isExpanded={isExpanded}
+              onClick={() => handleToolClick(t.id)}
+            />
+          ))}
+        </div>
 
-      {/* View Mode */}
-      <div className="flex bg-slate-800 rounded-lg p-1">
-        <button
-          onClick={() => onViewModeChange('2d')}
-          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-            viewMode === '2d' 
-              ? 'bg-blue-500 text-white' 
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          2D
-        </button>
-        <button
-          onClick={() => onViewModeChange('3d')}
-          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-            viewMode === '3d' 
-              ? 'bg-blue-500 text-white' 
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Cube className="w-4 h-4" />
-          3D
-        </button>
-        <button
-          onClick={() => onViewModeChange('split')}
-          className={`px-3 py-1.5 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${
-            viewMode === 'split' 
-              ? 'bg-blue-500 text-white' 
-              : 'text-slate-400 hover:text-slate-200'
-          }`}
-        >
-          <Split className="w-4 h-4" />
-          Split
-        </button>
+        <div className="border-t border-slate-700/50 mt-3 pt-3 px-2 flex flex-col gap-1">
+          <ActionButton
+            icon={<Undo2 size={18} />}
+            label="Desfazer"
+            onClick={undo}
+            disabled={!canUndo}
+            isExpanded={isExpanded}
+          />
+          <ActionButton
+            icon={<Redo2 size={18} />}
+            label="Refazer"
+            onClick={redo}
+            disabled={!canRedo}
+            isExpanded={isExpanded}
+          />
+          <ActionButton
+            icon={<Save size={18} />}
+            label="Salvar"
+            onClick={saveProject}
+            isExpanded={isExpanded}
+            highlight
+          />
+        </div>
       </div>
 
-      <div className="w-px h-6 bg-slate-700 mx-1" />
+      {/* MOBILE: Toolbar Horizontal Inferior */}
+      <div className={`
+        lg:hidden fixed bottom-0 left-0 right-0 z-50
+        bg-slate-900/98 backdrop-blur-2xl
+        border-t border-slate-700/50
+        safe-area-pb
+        ${className}
+      `}>
+        {/* Menu Expandido */}
+        <AnimatePresence>
+          {showMobileMenu && (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 20 }}
+              className="absolute bottom-full left-0 right-0 bg-slate-900/98 border-t border-slate-700/50 p-4 grid grid-cols-4 gap-3"
+            >
+              {tools.map((t) => (
+                <MobileToolButton
+                  key={t.id}
+                  tool={t}
+                  isActive={tool === t.id}
+                  onClick={() => handleToolClick(t.id)}
+                />
+              ))}
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-      {/* Tools */}
-      <div className="flex gap-0.5">
-        {tools.map((t) => (
+        {/* Barra Principal Mobile */}
+        <div className="flex items-center justify-between px-4 py-3">
+          {/* Ferramenta Ativa */}
           <button
-            key={t.id}
-            onClick={() => onToolChange(t.id)}
-            className={`p-2 rounded-lg transition-colors relative group ${
-              tool === t.id 
-                ? 'bg-blue-500 text-white' 
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-            }`}
-            title={`${t.label} (${t.shortcut})`}
+            onClick={() => setShowMobileMenu(!showMobileMenu)}
+            className={`
+              flex items-center gap-3 px-4 py-2 rounded-xl
+              ${showMobileMenu ? 'bg-blue-500/20 text-blue-400' : 'bg-slate-800 text-slate-200'}
+              transition-colors
+            `}
           >
-            <t.icon className="w-5 h-5" />
-            <span className="absolute -bottom-8 left-1/2 -translate-x-1/2 px-2 py-1 bg-slate-800 text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50 pointer-events-none">
-              {t.label}
+            <span className="text-blue-400">
+              {tools.find(t => t.id === tool)?.icon}
             </span>
+            <span className="font-medium text-sm">
+              {tools.find(t => t.id === tool)?.label}
+            </span>
+            <motion.div
+              animate={{ rotate: showMobileMenu ? 180 : 0 }}
+              transition={{ duration: 0.2 }}
+            >
+              <ChevronUp size={16} />
+            </motion.div>
           </button>
-        ))}
+
+          {/* Ações Rápidas */}
+          <div className="flex items-center gap-2">
+            <MobileActionButton
+              icon={<Undo2 size={20} />}
+              onClick={undo}
+              disabled={!canUndo}
+            />
+            <MobileActionButton
+              icon={<Redo2 size={20} />}
+              onClick={redo}
+              disabled={!canRedo}
+            />
+            <MobileActionButton
+              icon={<Save size={20} />}
+              onClick={saveProject}
+              highlight
+            />
+            <div className="w-px h-8 bg-slate-700 mx-1" />
+            <MobileActionButton
+              icon={<MoreVertical size={20} />}
+              onClick={onToggleSidebar}
+              active={isSidebarOpen}
+            />
+          </div>
+        </div>
       </div>
 
-      <div className="flex-1" />
-
-      {/* Right Side */}
-      <div className="flex items-center gap-1">
-        {/* Zoom Controls */}
-        <div className="flex items-center bg-slate-800 rounded-lg p-1">
-          <button
-            onClick={zoomOut}
-            className="p-1.5 rounded text-slate-400 hover:text-slate-200"
-            title="Zoom Out"
-          >
-            <Minus className="w-4 h-4" />
-          </button>
-          <span className="text-xs text-slate-400 px-2 min-w-[50px] text-center">
-            {(camera.zoom * 100).toFixed(0)}%
-          </span>
-          <button
-            onClick={zoomIn}
-            className="p-1.5 rounded text-slate-400 hover:text-slate-200"
-            title="Zoom In"
-          >
-            <Plus className="w-4 h-4" />
-          </button>
-          <button
-            onClick={fitToView}
-            className="p-1.5 rounded text-slate-400 hover:text-slate-200 ml-1"
-            title="Fit to View"
-          >
-            <Focus className="w-4 h-4" />
-          </button>
-        </div>
-
-        <div className="w-px h-6 bg-slate-700" />
-
-        {/* Grid Toggle */}
-        <button
-          onClick={toggleGrid}
-          className={`p-2 rounded-lg transition-colors ${
-            grid.visible 
-              ? 'text-blue-400 bg-blue-500/10' 
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
-          }`}
-          title="Toggle Grid"
-        >
-          <Grid3X3 className="w-5 h-5" />
-        </button>
-
-        <div className="w-px h-6 bg-slate-700" />
-
-        {/* Undo/Redo */}
-        <button
-          onClick={undo}
-          disabled={!canUndo()}
-          className="p-2 rounded-lg text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800"
-          title="Undo (Ctrl+Z)"
-        >
-          <Undo className="w-5 h-5" />
-        </button>
-        <button
-          onClick={redo}
-          disabled={!canRedo()}
-          className="p-2 rounded-lg text-slate-400 hover:text-slate-200 disabled:opacity-30 disabled:cursor-not-allowed hover:bg-slate-800"
-          title="Redo (Ctrl+Y)"
-        >
-          <Redo className="w-5 h-5" />
-        </button>
-
-        <div className="w-px h-6 bg-slate-700" />
-
-        {/* Save */}
-        <button
-          onClick={() => saveProject()}
-          className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-          title="Save (Ctrl+S)"
-        >
-          <Save className="w-5 h-5" />
-        </button>
-
-        {/* Export Dropdown */}
-        <div className="relative">
-          <button
-            onClick={() => setShowExportMenu(!showExportMenu)}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-            title="Export"
-          >
-            <Download className="w-5 h-5" />
-          </button>
-          <AnimatePresence>
-            {showExportMenu && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="absolute right-0 top-full mt-2 w-48 bg-slate-800 border border-slate-700 rounded-lg shadow-xl z-50"
-              >
-                <div className="p-2">
-                  <button
-                    onClick={() => handleExport('json')}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700 hover:text-white"
-                  >
-                    <FileImage className="w-4 h-4" />
-                    Exportar JSON
-                  </button>
-                  <button
-                    onClick={() => handleExport('png')}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700 hover:text-white"
-                  >
-                    <Camera className="w-4 h-4" />
-                    Exportar PNG
-                  </button>
-                  <button
-                    onClick={() => handleExport('pdf')}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700 hover:text-white"
-                  >
-                    <Printer className="w-4 h-4" />
-                    Exportar PDF
-                  </button>
-                  <div className="border-t border-slate-700 my-1" />
-                  <button
-                    onClick={() => handleExport('share')}
-                    className="w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm text-slate-300 hover:bg-slate-700 hover:text-white"
-                  >
-                    <Share2 className="w-4 h-4" />
-                    Compartilhar
-                  </button>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-
-        {/* Settings */}
-        <button
-          className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800"
-          title="Settings"
-        >
-          <Settings className="w-5 h-5" />
-        </button>
+      {/* Zoom Controls - Desktop (canto direito) */}
+      <div className="hidden lg:flex fixed right-4 bottom-4 flex-col gap-2 z-50">
+        <ZoomButton icon={<ZoomIn size={18} />} onClick={() => {}} label="Aumentar zoom" />
+        <ZoomButton icon={<ZoomOut size={18} />} onClick={() => {}} label="Diminuir zoom" />
       </div>
-    </div>
+
+      {/* Zoom Controls - Mobile (canto direito, acima da toolbar) */}
+      <div className="lg:hidden fixed right-4 bottom-24 flex flex-col gap-2 z-50">
+        <ZoomButton icon={<ZoomIn size={20} />} onClick={() => {}} label="Aumentar zoom" mobile />
+        <ZoomButton icon={<ZoomOut size={20} />} onClick={() => {}} label="Diminuir zoom" mobile />
+      </div>
+    </>
   );
+};
+
+// Componentes Auxiliares
+
+interface ToolButtonProps {
+  tool: ToolButton;
+  isActive: boolean;
+  isExpanded: boolean;
+  onClick: () => void;
 }
+
+const ToolButtonComponent: React.FC<ToolButtonProps> = ({ tool, isActive, isExpanded, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`
+      group relative flex items-center justify-center
+      ${isExpanded ? 'w-full h-12' : 'w-8 h-8'}
+      rounded-xl transition-all duration-200
+      ${isActive 
+        ? 'bg-blue-500 text-white shadow-lg shadow-blue-500/25' 
+        : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+      }
+    `}
+  >
+    {tool.icon}
+    
+    {/* Badge Premium */}
+    {tool.premium && (
+      <span className="absolute -top-1 -right-1 w-2 h-2 bg-amber-400 rounded-full" />
+    )}
+    
+    {/* Tooltip */}
+    {isExpanded && (
+      <span className="absolute left-full ml-3 px-2 py-1 bg-slate-800 text-slate-200 text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+        {tool.label}
+        {tool.shortcut && <span className="ml-2 text-slate-500">{tool.shortcut}</span>}
+      </span>
+    )}
+  </button>
+);
+
+interface ActionButtonProps {
+  icon: React.ReactNode;
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  isExpanded: boolean;
+  highlight?: boolean;
+}
+
+const ActionButton: React.FC<ActionButtonProps> = ({ 
+  icon, label, onClick, disabled, isExpanded, highlight 
+}) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={`
+      group relative flex items-center justify-center
+      ${isExpanded ? 'w-full h-10' : 'w-8 h-8'}
+      rounded-xl transition-all duration-200
+      ${disabled 
+        ? 'text-slate-600 cursor-not-allowed' 
+        : highlight
+          ? 'text-emerald-400 hover:bg-emerald-500/10'
+          : 'text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+      }
+    `}
+  >
+    {icon}
+    
+    {isExpanded && (
+      <span className="absolute left-full ml-3 px-2 py-1 bg-slate-800 text-slate-200 text-xs rounded-md opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+        {label}
+      </span>
+    )}
+  </button>
+);
+
+interface MobileToolButtonProps {
+  tool: ToolButton;
+  isActive: boolean;
+  onClick: () => void;
+}
+
+const MobileToolButton: React.FC<MobileToolButtonProps> = ({ tool, isActive, onClick }) => (
+  <button
+    onClick={onClick}
+    className={`
+      flex flex-col items-center gap-2 p-3 rounded-xl transition-all
+      ${isActive 
+        ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30' 
+        : 'bg-slate-800 text-slate-400 border border-transparent'
+      }
+    `}
+  >
+    {tool.icon}
+    <span className="text-xs font-medium">{tool.label}</span>
+    {tool.premium && (
+      <span className="text-[10px] text-amber-400 font-medium">PRO</span>
+    )}
+  </button>
+);
+
+interface MobileActionButtonProps {
+  icon: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  highlight?: boolean;
+  active?: boolean;
+}
+
+const MobileActionButton: React.FC<MobileActionButtonProps> = ({ 
+  icon, onClick, disabled, highlight, active 
+}) => (
+  <button
+    onClick={onClick}
+    disabled={disabled}
+    className={`
+      p-2.5 rounded-xl transition-all
+      ${disabled 
+        ? 'text-slate-600' 
+        : active
+          ? 'bg-blue-500/20 text-blue-400'
+          : highlight
+            ? 'bg-emerald-500/20 text-emerald-400'
+            : 'text-slate-400 hover:bg-slate-800'
+      }
+    `}
+  >
+    {icon}
+  </button>
+);
+
+interface ZoomButtonProps {
+  icon: React.ReactNode;
+  onClick: () => void;
+  label: string;
+  mobile?: boolean;
+}
+
+const ZoomButton: React.FC<ZoomButtonProps> = ({ icon, onClick, label, mobile }) => (
+  <button
+    onClick={onClick}
+    className={`
+      flex items-center justify-center
+      ${mobile ? 'w-11 h-11' : 'w-10 h-10'}
+      bg-slate-900/95 backdrop-blur-xl
+      border border-slate-700/50
+      rounded-xl text-slate-400
+      hover:bg-slate-800 hover:text-slate-200
+      transition-all shadow-lg
+    `}
+    title={label}
+  >
+    {icon}
+  </button>
+);
+
+export default Toolbar;

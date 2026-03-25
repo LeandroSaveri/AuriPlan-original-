@@ -384,4 +384,4 @@ const Canvas2D: React.FC<Canvas2DProps> = ({ className = '' }) => {
   );
 };
 
-export default Canvas2D;
+export { Canvas2D };

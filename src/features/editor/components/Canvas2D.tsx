@@ -1,13 +1,13 @@
 // Canvas2D.tsx - Orquestrador Production-Grade Final
 import React, { useRef, useEffect, useCallback, useState } from 'react';
-import { useEditorStore, selectCurrentScene } from '../../../../store/editorStore';
-import { CameraEngine } from '../../../../core/camera/CameraEngine';
-import { SnapEngine } from '../../../../core/snap/SnapEngine';
-import { GridEngine } from '../../../../core/grid/GridEngine';
-import { InteractionEngine } from '../../../../core/interaction/InteractionEngine';
-import { WallRenderer } from '../../../../core/wall/WallRenderer';
-import { RoomRenderer } from '../../../../core/room/RoomRenderer';
-import type { Vec2 } from '../../../../types';
+import { useEditorStore, selectCurrentScene } from '../../../store/editorStore';
+import { CameraEngine } from '../../../core/camera/CameraEngine';
+import { SnapEngine } from '../../../core/snap/SnapEngine';
+import { GridEngine } from '../../../core/grid/GridEngine';
+import { InteractionEngine } from '../../../core/interaction/InteractionEngine';
+import { WallRenderer } from '../../../core/wall/WallRenderer';
+import { RoomRenderer } from '../../../core/room/RoomRenderer';
+import type { Vec2 } from '../../../types';
 
 interface Canvas2DProps { className?: string; }
 

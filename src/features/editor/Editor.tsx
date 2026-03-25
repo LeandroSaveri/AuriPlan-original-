@@ -9,8 +9,6 @@ import { Toolbar } from './components/Toolbar';
 import { Sidebar } from './components/Sidebar';
 import { Canvas2D } from './components/Canvas2D';
 import { StatusBar } from './components/StatusBar';
-import { PropertyPanel } from './components/PropertyPanel';
-import { ZoomControls } from './components/ZoomControls';
 import { WallData, RoomData } from '../../types/editor';
 
 // ============================================
@@ -146,13 +144,10 @@ export const Editor: React.FC<EditorProps> = ({ projectId, initialData }) => {
 
   const handleCanvasClick = useCallback((e: React.MouseEvent, worldPoint: { x: number; y: number }) => {
     if (isWallTool) {
-      // Lógica de desenho de parede
       console.log('Desenhar parede em:', worldPoint);
     } else if (isRoomTool) {
-      // Lógica de desenho de cômodo
       console.log('Desenhar cômodo em:', worldPoint);
     } else if (isSelectTool) {
-      // Limpar seleção se clicar no vazio
       clearSelection();
     }
   }, [isWallTool, isRoomTool, isSelectTool, clearSelection]);
@@ -234,23 +229,14 @@ export const Editor: React.FC<EditorProps> = ({ projectId, initialData }) => {
             onPan={pan}
           />
 
-          {/* Controles de Zoom (flutuante) */}
-          <ZoomControls
-            scale={scale}
-            onZoomIn={zoomIn}
-            onZoomOut={zoomOut}
-            onReset={resetView}
-          />
+          {/* Controles de Zoom (flutuante) - TEMPORARIAMENTE REMOVIDO */}
+          <div style={styles.zoomControls}>
+            <button onClick={zoomOut} style={styles.zoomButton}>-</button>
+            <span style={styles.zoomText}>{Math.round(scale * 100)}%</span>
+            <button onClick={zoomIn} style={styles.zoomButton}>+</button>
+            <button onClick={resetView} style={styles.zoomButton}>⟲</button>
+          </div>
         </div>
-
-        {/* Painel de Propriedades Direita */}
-        <PropertyPanel
-          selectedObject={getSelectedObject()}
-          onWallUpdate={handleWallUpdate}
-          onRoomUpdate={handleRoomUpdate}
-          onDeleteWall={deleteWall}
-          onDeleteRoom={deleteRoom}
-        />
       </div>
 
       {/* Status Bar Inferior */}
@@ -290,6 +276,40 @@ const styles: Record<string, React.CSSProperties> = {
     position: 'relative',
     overflow: 'hidden',
     backgroundColor: '#16213e',
+  },
+  zoomControls: {
+    position: 'absolute',
+    bottom: 16,
+    right: 16,
+    display: 'flex',
+    gap: 8,
+    alignItems: 'center',
+    backgroundColor: '#1e1e2e',
+    padding: '8px 12px',
+    borderRadius: 8,
+    border: '1px solid #2d2d3d',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.3)',
+  },
+  zoomButton: {
+    width: 32,
+    height: 32,
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#252536',
+    border: '1px solid #2d2d3d',
+    borderRadius: 6,
+    color: '#ffffff',
+    cursor: 'pointer',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  zoomText: {
+    fontSize: 12,
+    fontWeight: 600,
+    minWidth: 50,
+    textAlign: 'center',
+    color: '#d1d5db',
   },
 };
 

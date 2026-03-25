@@ -6,15 +6,11 @@
     <meta name="description" content="AuriPlan - Ferramenta profissional de design de interiores com visualização 2D/3D" />
     <meta name="theme-color" content="#0f172a" />
     
-    <!-- Favicon -->
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    
-    <!-- Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
     
-    <!-- Open Graph -->
     <meta property="og:title" content="AuriPlan Pro" />
     <meta property="og:description" content="Ferramenta profissional de design de interiores" />
     <meta property="og:type" content="website" />
@@ -22,7 +18,6 @@
     <title>AuriPlan - Design de Interiores</title>
     
     <style>
-      /* Critical CSS for loading state */
       body {
         margin: 0;
         background: #0f172a;
@@ -38,10 +33,12 @@
         justify-content: center;
         background: #0f172a;
         z-index: 9999;
+        transition: opacity 0.3s ease;
       }
       
       #loading.hidden {
-        display: none;
+        opacity: 0;
+        pointer-events: none;
       }
       
       .loading-spinner {
@@ -59,7 +56,6 @@
     </style>
   </head>
   <body>
-    <!-- Loading Screen -->
     <div id="loading">
       <div class="loading-spinner"></div>
     </div>
@@ -69,14 +65,14 @@
     <script type="module" src="/src/main.tsx"></script>
     
     <script>
-      // Hide loading screen when app is ready
-      window.addEventListener('load', () => {
+      // CORREÇÃO: Usar DOMContentLoaded em vez de load
+      document.addEventListener('DOMContentLoaded', () => {
         setTimeout(() => {
           const loading = document.getElementById('loading');
           if (loading) {
             loading.classList.add('hidden');
           }
-        }, 500);
+        }, 300);
       });
     </script>
   </body>

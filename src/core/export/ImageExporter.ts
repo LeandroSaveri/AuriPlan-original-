@@ -21,7 +21,10 @@ export interface ImageExportResult {
   size: number; // in bytes
 }
 
-class ImageExporter {
+// ============================================
+// CLASSE EXPORTADA - necessária para ExportEngine.ts
+// ============================================
+export class ImageExporter {
   private defaultOptions: ImageExportOptions = {
     format: 'png',
     quality: 0.95,

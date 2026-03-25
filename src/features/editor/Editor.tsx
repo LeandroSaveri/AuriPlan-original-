@@ -4,15 +4,14 @@
 // ============================================
 
 import React, { useEffect, useCallback } from 'react';
-import { useEditor, useEditorTools, useEditorHistory } from '../../../hooks';
-import { Toolbar } from './Toolbar';
-import { Sidebar } from './Sidebar';
-import { Canvas2D } from './Canvas2D';
-import { StatusBar } from './StatusBar';
-import { PropertyPanel } from './PropertyPanel';
-import { ZoomControls } from './ZoomControls';
-import { editorActions } from '../../../store/editorActions';
-import { WallData, RoomData } from '../../../types/editor';
+import { useEditor, useEditorTools } from '../../hooks';
+import { Toolbar } from './components/Toolbar';
+import { Sidebar } from './components/Sidebar';
+import { Canvas2D } from './components/Canvas2D';
+import { StatusBar } from './components/StatusBar';
+import { PropertyPanel } from './components/PropertyPanel';
+import { ZoomControls } from './components/ZoomControls';
+import { WallData, RoomData } from '../../types/editor';
 
 // ============================================
 // TIPOS

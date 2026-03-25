@@ -1,44 +1,66 @@
-const toolRef = useRef(useEditorStore.getState().tool);
-const isDrawingRef = useRef(false);
-const drawStartRef = useRef<Vec2 | null>(null);
-const hoveredIdRef = useRef<string | null>(null);
+Canvas2D.tsx - Orquestrador Premium Internacional
 
-// função segura para pegar a cena atual
-const getCurrentScene = (state: any) =>
-  state.scenes?.find((s: any) => s.id === state.currentSceneId) ?? null;
+import { useRef, useEffect, useCallback, useState } from 'react';
+import { useEditorStore } from '@/store';
+import { camera, grid, snap, interaction, wallRenderer, roomRenderer } from '@/core';
+import type { Vec2 } from '@/types';
 
-const sceneRef = useRef(getCurrentScene(useEditorStore.getState()));
-const selectedIdsRef = useRef(useEditorStore.getState().selectedIds ?? []);
+interface Canvas2DProps {
+  className?: string;
+}
 
-const [hoveredId, setHoveredId] = useState<string | null>(null);
-const [isDrawing, setIsDrawing] = useState(false);
-const [drawStart, setDrawStart] = useState<Vec2 | null>(null);
-const [tool, setTool] = useState(useEditorStore.getState().tool);
+const Canvas2D: React.FC<Canvas2DProps> = ({ className = '' }) => {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const ctxRef = useRef<CanvasRenderingContext2D | null>(null);
+  const canvasRectRef = useRef({ width: 0, height: 0 });
+  const rafRef = useRef<number>(0);
+  const lastFrameRef = useRef<number>(0);
+  const targetFrame = 1000 / 60;
+  const isReadyRef = useRef(false);
+  const gridCacheRef = useRef<HTMLCanvasElement | null>(null);
+  const gridCacheCameraRef = useRef<string | null>(null);
 
-// pegar config do store
-const { grid: gridCfg, snap: snapCfg, addWall, select } = useEditorStore();
+  const toolRef = useRef(useEditorStore.getState().tool);
+  const isDrawingRef = useRef(false);
+  const drawStartRef = useRef<Vec2 | null>(null);
+  const hoveredIdRef = useRef<string | null>(null);
 
-useEffect(() => { toolRef.current = tool; }, [tool]);
-useEffect(() => { isDrawingRef.current = isDrawing; }, [isDrawing]);
-useEffect(() => { drawStartRef.current = drawStart; }, [drawStart]);
-useEffect(() => { hoveredIdRef.current = hoveredId; }, [hoveredId]);
+  // função segura para pegar a cena atual - CORRIGIDO
+  const getCurrentScene = (state: any) =>
+    state.scenes?.find((s: any) => s.id === state.currentSceneId) ?? null;
 
-useEffect(() => {
-  const unsub = useEditorStore.subscribe((state: any) => {
+  const sceneRef = useRef(getCurrentScene(useEditorStore.getState()));
+  const selectedIdsRef = useRef(useEditorStore.getState().selectedIds ?? []);
 
-    sceneRef.current =
-      state.scenes?.find((s: any) => s.id === state.currentSceneId) ?? null;
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
+  const [drawStart, setDrawStart] = useState<Vec2 | null>(null);
+  const [tool, setTool] = useState(useEditorStore.getState().tool);
 
-    selectedIdsRef.current = state.selectedIds ?? [];
+  // pegar config do store
+  const { grid: gridCfg, snap: snapCfg, addWall, select } = useEditorStore();
 
-    if (state.tool !== toolRef.current) {
-      setTool(state.tool);
-    }
+  useEffect(() => { toolRef.current = tool; }, [tool]);
+  useEffect(() => { isDrawingRef.current = isDrawing; }, [isDrawing]);
+  useEffect(() => { drawStartRef.current = drawStart; }, [drawStart]);
+  useEffect(() => { hoveredIdRef.current = hoveredId; }, [hoveredId]);
 
-  });
+  useEffect(() => {
+    const unsub = useEditorStore.subscribe((state: any) => {
+      // CORRIGIDO - uso seguro com optional chaining
+      sceneRef.current =
+        state.scenes?.find((s: any) => s.id === state.currentSceneId) ?? null;
 
-  return unsub;
-}, []);
+      selectedIdsRef.current = state.selectedIds ?? [];
+
+      if (state.tool !== toolRef.current) {
+        setTool(state.tool);
+      }
+    });
+
+    return unsub;
+  }, []);
 
   // screenToWorld otimizado
   const screenToWorld = useCallback((p: any): Vec2 => {

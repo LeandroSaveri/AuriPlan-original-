@@ -1,4 +1,4 @@
-Canvas2D.tsx - Orquestrador Premium Internacional
+/*Canvas2D.tsx Orquestrador Premium*/
 
 import { useRef, useEffect, useCallback, useState } from 'react';
 import { useEditorStore } from '@/store';

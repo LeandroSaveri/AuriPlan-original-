@@ -1,4 +1,7 @@
-// Project system exports
+// ============================================
+// Project System Exports
+// ============================================
+
 export { ProjectManager } from './ProjectManager';
 export type { ProjectSettings, ProjectState } from './ProjectManager';
 

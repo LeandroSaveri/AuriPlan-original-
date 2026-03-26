@@ -1,5 +1,5 @@
 // ============================================
-// APP - Só Home (Editor removido temporariamente)
+// APP - Aplicação Principal
 // ============================================
 
 import { useState, useEffect } from 'react';
@@ -11,17 +11,19 @@ import {
   Settings, 
   User, 
   Box,
-  Layout
+  ChevronRight,
+  Layout,
+  Sparkles
 } from 'lucide-react';
 
 // ============================================
-// HOME PAGE
+// HOME PAGE - Página Inicial
 // ============================================
 function HomePage({ onCreateProject, onOpenProject }: { 
   onCreateProject: () => void; 
   onOpenProject: () => void;
 }) {
-  const [recentProjects, setRecentProjects] = useState<Array<{ id: string; name: string; updatedAt: string }>>([]));
+  const [recentProjects, setRecentProjects] = useState<Array<{ id: string; name: string; updatedAt: string }>>([]);
 
   useEffect(() => {
     const saved = localStorage.getItem('recentProjects');
@@ -142,22 +144,25 @@ function HomePage({ onCreateProject, onOpenProject }: {
 }
 
 // ============================================
-// MAIN APP - SÓ HOME (sem Editor)
+// MAIN APP - SÓ HOME (sem Editor por enquanto)
 // ============================================
 export default function App() {
+  const [view, setView] = useState<'home' | 'editor'>('home');
+
   const handleCreateProject = () => {
-    console.log('Novo projeto - Editor em desenvolvimento');
-    alert('Editor em desenvolvimento! Volte em breve.');
+    // Por enquanto só volta para home (Editor desativado)
+    console.log('Novo projeto clicado - Editor desativado temporariamente');
+    // setView('editor'); // Comentado até o Editor estar funcionando
   };
 
   const handleOpenProject = () => {
-    console.log('Abrir projeto - Editor em desenvolvimento');
-    alert('Editor em desenvolvimento! Volte em breve.');
+    console.log('Abrir projeto clicado');
   };
 
   return (
     <AnimatePresence mode="wait">
       <motion.div
+        key="home"
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
